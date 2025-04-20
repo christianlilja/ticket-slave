@@ -1,0 +1,46 @@
+<!-- templates/create_ticket.html -->
+{% extends "base.html" %}
+
+{% block title %}Create Ticket{% endblock %}
+
+{% block content %}
+<h2>Create Ticket</h2>
+<form method="post">
+    <div class="mb-3">
+        <label for="title" class="form-label">Title</label>
+        <input type="text" name="title" id="title" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+        <label for="description" class="form-label">Description</label>
+        <textarea name="description" id="description" class="form-control"></textarea>
+    </div>
+
+    <div class="mb-3">
+        <label for="priority" class="form-label">Priority</label>
+        <select name="priority" id="priority" class="form-select">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="queue_id" class="form-label">Queue</label>
+        <select name="queue_id" id="queue_id" class="form-select">
+          {% for queue in queues %}
+          <option value="{{ queue['id'] }}">{{ queue['name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+    <div class="mb-3">
+        <label for="deadline" class="form-label">Deadline</label>
+        <input type="datetime-local" name="deadline" id="deadline" class="form-control">
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create Ticket</button>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}
+

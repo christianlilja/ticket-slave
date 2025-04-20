@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Ticket #{{ ticket['id'] }} - {{ ticket['title'] }}</h2>
+<p>{{ ticket['description'] }}</p>
+<p><strong>Status:</strong> {{ ticket['status'] }}</p>
+<p><strong>Priority:</strong> {{ ticket['priority'] }}</p>
+<p><strong>Deadline:</strong> {{ ticket['deadline'] }}</p>
+
+<form method="post" action="/ticket/{{ ticket['id'] }}/status" class="mb-4">
+    <div class="input-group">
+        <select name="status" class="form-select">
+            <option value="open" {% if ticket['status'] == 'open' %}selected{% endif %}>Open</option>
+            <option value="in progress" {% if ticket['status'] == 'in progress' %}selected{% endif %}>In Progress</option>
+            <option value="closed" {% if ticket['status'] == 'closed' %}selected{% endif %}>Closed</option>
+        </select>
+        <button type="submit" class="btn btn-outline-primary">Update status</button>
+    </div>
+</form>
+
+<h4>Comments</h4>
+<ul class="list-group mb-3">
+    {% for comment in comments %}
+    <li class="list-group-item">
+        <small class="text-muted">{{ comment['created_at'][:16].replace('T', ' ') }}</small><br>
+        {{ comment['content'] }}
+    </li>
+    {% endfor %}
+</ul>
+
+<form method="post" action="/ticket/{{ ticket['id'] }}/comment">
+    <div class="mb-3">
+        <label for="content" class="form-label">New comment</label>
+        <textarea name="content" class="form-control" rows="3" required></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Add comment</button>
+    <a href="/" class="btn btn-secondary">Back</a>
+</form>
+{% endblock %}
