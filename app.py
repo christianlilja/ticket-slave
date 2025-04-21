@@ -36,7 +36,7 @@ def get_db_connection():
 
 @app.route('/')
 def index():
-    show_closed = request.args.get('show_closed', 'true').lower() == 'true'
+    show_closed = request.args.get('show_closed', 'false').lower() == 'true'
     sort_by = request.args.get('sort_by', 'created_at')
 
     valid_sorts = {'created_at', 'priority', 'deadline'}

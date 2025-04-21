@@ -28,11 +28,20 @@
     <div class="mb-3">
         <label for="queue_id" class="form-label">Queue</label>
         <select name="queue_id" id="queue_id" class="form-select">
-          {% for queue in queues %}
-          <option value="{{ queue['id'] }}">{{ queue['name'] }}</option>
-          {% endfor %}
+            {% for queue in queues %}
+            <option value="{{ queue['id'] }}">{{ queue['name'] }}</option>
+            {% endfor %}
         </select>
-      </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="status" class="form-label">Status</label>
+        <select name="status" id="status" class="form-select">
+            <option value="open" selected>Open</option>
+            <option value="in progress">In Progress</option>
+            <option value="closed">Closed</option>
+        </select>
+    </div>
 
     <div class="mb-3">
         <label for="deadline" class="form-label">Deadline</label>
