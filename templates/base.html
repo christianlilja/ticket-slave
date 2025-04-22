@@ -7,11 +7,25 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="container py-4">
-    <nav class="mb-4">
+  <nav class="mb-4 d-flex justify-content-between align-items-center">
+    <div>
         <a href="/" class="btn btn-outline-light me-2">Home</a>
         <a href="/create" class="btn btn-outline-light me-2">Create Ticket</a>
         <a href="/queues" class="btn btn-outline-light">Queues</a>
-    </nav>
+    </div>
+    {% if session.get('username') %}
+    <div class="dropdown">
+      <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+        {{ session['username'] }}
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+        <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
+      </ul>
+    </div>
+    {% endif %}
+  </nav>
+<!-- Bootstrap JS Bundle (includes Popper) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-HoA2VbF34s5UfVw6E6VXt8P6MebLk3GEg5wDQwHi9KH6O+o05ozZskNwP3Bgz+zN" crossorigin="anonymous"></script>
 
     {% block content %}
     {% endblock %}

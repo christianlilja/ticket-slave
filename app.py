@@ -1,5 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from functools import wraps
 import sqlite3
 
 app = Flask(__name__)
@@ -33,8 +35,17 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash("Please log in to access this page.", "warning")
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
+@login_required
 def index():
     show_closed = request.args.get('show_closed', 'false').lower() == 'true'
     sort_by = request.args.get('sort_by', 'created_at')
@@ -107,9 +118,61 @@ def index():
         sort_by=sort_by
     )
 
+app.secret_key = 'change-me-top-secret'  # Replace this with a secure secret key
 
+# Registration route
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = generate_password_hash(request.form['password'])
+
+        with sqlite3.connect(DB_PATH) as conn:
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM users WHERE username = ?', (username,))
+            if cur.fetchone():
+                flash('Username already exists', 'danger')
+                return redirect(url_for('register'))
+
+            cur.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+            conn.commit()
+            flash('Registered successfully. Please log in.', 'success')
+            return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+# Login route
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        conn.close()
+
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            flash('Login successful!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password.', 'danger')
+
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash("Logged out successfully.", "info")
+    return redirect(url_for('login'))
 
 @app.route("/queues", methods=["GET", "POST"])
+@login_required
 def manage_queues():
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
@@ -125,6 +188,7 @@ def manage_queues():
     return render_template("queues.html", queues=queues)
 
 @app.route('/ticket/<int:ticket_id>')
+@login_required
 def ticket_detail(ticket_id):
     conn = get_db_connection()
     conn.row_factory = sqlite3.Row  # ✅ Ensure dictionary-style access
@@ -138,6 +202,7 @@ def ticket_detail(ticket_id):
     return render_template('ticket_detail.html', ticket=ticket, comments=comments)
 
 @app.route('/create', methods=['GET', 'POST'])
+@login_required
 def create_ticket():
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -162,6 +227,7 @@ def create_ticket():
     return render_template('create_ticket.html', queues=queues)
 
 @app.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
+@login_required
 def add_comment(ticket_id):
     content = request.form['content']
     created_at = datetime.now().isoformat()
@@ -171,6 +237,7 @@ def add_comment(ticket_id):
     return redirect(url_for('ticket_detail', ticket_id=ticket_id))
 
 @app.route('/ticket/<int:ticket_id>/status', methods=['POST'])
+@login_required
 def update_status(ticket_id):
     status = request.form['status']
     with sqlite3.connect(DB_PATH) as conn:
