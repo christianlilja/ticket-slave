@@ -10,6 +10,7 @@ DB_PATH = 'database.db'
 def init_db():
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
+        # Tickets table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tickets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,14 +19,34 @@ def init_db():
                 status TEXT DEFAULT 'open',
                 priority TEXT DEFAULT 'medium',
                 deadline TEXT,
+                created_at TEXT,
                 queue_id INTEGER,
                 FOREIGN KEY (queue_id) REFERENCES queues(id)
             )
         """)
+        # Queues table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS queues (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL
+            )
+        """)
+        # Users table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL
+            )
+        """)
+        # Comments table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER,
+                content TEXT NOT NULL,
+                created_at TEXT,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id)
             )
         """)
         conn.commit()
