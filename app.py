@@ -74,7 +74,7 @@ def handle_template_not_found(e):
 @app.errorhandler(TemplateSyntaxError)
 def handle_template_syntax_error(e):
     current_app.logger.error(f"Template syntax error: {e}")
-    msg = "There’s a syntax issue in one of the templates."
+    msg = "There is a syntax issue in one of the templates."
     return render_template("error.html", error=msg), 500
 
 @app.errorhandler(404)
