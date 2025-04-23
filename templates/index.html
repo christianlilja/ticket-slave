@@ -45,7 +45,7 @@
     </thead>
     <tbody>
         {% for ticket in tickets %}
-        <tr onclick="window.location='{{ url_for('ticket_detail', ticket_id=ticket['id']) }}'" style="cursor: pointer;">
+        <tr onclick="window.location='{{ url_for('ticket_detail', ticket_id=ticket['id']) }}'">
             <td>{{ ticket['id'] }}</td>
             <td>{{ ticket['title'] }}</td>
             <td>{{ ticket['status'] }}</td>
@@ -76,4 +76,28 @@
         {% endfor %}
     </tbody>
 </table>
+
+{% if total_pages > 1 %}
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+        {% if page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('index', page=page-1, sort_by=sort_by, show_closed=show_closed) }}">Previous</a>
+        </li>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('index', page=p, sort_by=sort_by, show_closed=show_closed) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+
+        {% if page < total_pages %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('index', page=page+1, sort_by=sort_by, show_closed=show_closed) }}">Next</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
 {% endblock %}
