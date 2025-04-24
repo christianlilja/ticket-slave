@@ -5,8 +5,17 @@ from functools import wraps
 from jinja2 import TemplateNotFound, TemplateSyntaxError
 from contextlib import contextmanager
 import sqlite3
+import os
 
 app = Flask(__name__)
+IS_PROD = os.environ.get('FLASK_ENV') == 'production'
+
+if IS_PROD and not os.environ.get('SECRET_KEY'):
+    raise RuntimeError("SECRET_KEY must be set in production")
+
+#Set variable in prod: export SECRET_KEY='a-very-strong-and-random-secret-key'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
+
 DB_PATH = 'database.db'
 
 @contextmanager
@@ -21,25 +30,31 @@ def get_db():
 def init_db():
     with get_db() as conn:
         cursor = conn.cursor()
+
+        # Enable foreign key constraints
+        cursor.execute("PRAGMA foreign_keys = ON")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS queues (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
+            )
+        """)
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tickets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 description TEXT,
-                status TEXT DEFAULT 'open',
-                priority TEXT DEFAULT 'medium',
+                status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'in progress', 'closed')),
+                priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high')),
                 deadline TEXT,
-                created_at TEXT,
-                queue_id INTEGER,
-                FOREIGN KEY (queue_id) REFERENCES queues(id)
+                created_at TEXT NOT NULL,
+                queue_id INTEGER NOT NULL,
+                FOREIGN KEY (queue_id) REFERENCES queues(id) ON DELETE CASCADE
             )
         """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS queues (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL
-            )
-        """)
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,16 +62,19 @@ def init_db():
                 password TEXT NOT NULL
             )
         """)
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS comments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id INTEGER,
+                ticket_id INTEGER NOT NULL,
                 content TEXT NOT NULL,
-                created_at TEXT,
-                FOREIGN KEY (ticket_id) REFERENCES tickets(id)
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
             )
         """)
+
         conn.commit()
+
 
 def login_required(f):
     @wraps(f)
@@ -174,8 +192,6 @@ def index():
         total_pages=total_pages
     )
 
-app.secret_key = 'change-me-top-secret'
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -263,12 +279,29 @@ def create_ticket():
             deadline = request.form['deadline']
             queue_id = request.form.get('queue_id')
             created_at = datetime.now().isoformat()
-            conn.execute('''
-                INSERT INTO tickets (title, description, status, priority, deadline, created_at, queue_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                (title, description, status, priority, deadline, created_at, queue_id))
-            conn.commit()
-            return redirect(url_for('index'))
+
+            try:
+                conn.execute('''
+                    INSERT INTO tickets (title, description, status, priority, deadline, created_at, queue_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                    (title, description, status, priority, deadline, created_at, queue_id))
+                conn.commit()
+                flash('Ticket created successfully!', 'success')
+                return redirect(url_for('index'))
+            except Exception as e:
+                current_app.logger.error(f"Error creating ticket: {e}")
+                flash('An error occurred while creating the ticket. Please try again.', 'danger')
+                # Re-render the form with user's previously entered data
+                return render_template(
+                    'create_ticket.html',
+                    queues=queues,
+                    title=title,
+                    description=description,
+                    status=status,
+                    priority=priority,
+                    deadline=deadline,
+                    queue_id=queue_id
+                )
 
     return render_template('create_ticket.html', queues=queues)
 
