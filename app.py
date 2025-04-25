@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, current_app
+from flask import Flask, render_template, request, redirect, url_for, session, flash, current_app, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from functools import wraps
 from jinja2 import TemplateNotFound, TemplateSyntaxError
 from contextlib import contextmanager
+from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
+from api import *
 import sqlite3
 import os
 
@@ -212,6 +214,71 @@ def register():
 
     return render_template('register.html')
 
+@app.route('/create-admin')
+def create_admin():
+    username = "admin"
+    password = "changeme"  # Change this before deploying!
+    hashed_password = generate_password_hash(password)
+    is_admin = 1
+
+    conn = sqlite3.connect('database.db')  # Use your actual path
+    c = conn.cursor()
+
+    # Check if admin already exists
+    c.execute("SELECT * FROM users WHERE username = ?", (username,))
+    if c.fetchone():
+        conn.close()
+        return "Admin user already exists."
+
+    # Create the admin user
+    c.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)",
+              (username, hashed_password, is_admin))
+    conn.commit()
+    conn.close()
+
+    # Self-destruct by removing the route function
+    del app.view_functions['create_admin']
+    return "Admin user created successfully. This route is now disabled."
+
+@app.route("/users", methods=["GET", "POST"])
+@login_required
+def users():
+    if not session.get("is_admin"):
+        return redirect(url_for("index"))
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        # Add user
+        if request.method == "POST" and "new_username" in request.form:
+            username = request.form["new_username"]
+            password = generate_password_hash(request.form["new_password"])
+            # Set is_admin to 0 explicitly, since admin creation is disabled
+            is_admin = 0
+            try:
+                cursor.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)", (username, password, is_admin))
+                conn.commit()
+            except sqlite3.IntegrityError:
+                flash("Username already exists.", "danger")
+
+        # Delete user
+        if request.method == "POST" and "delete_user" in request.form:
+            user_to_delete = request.form["delete_user"]
+            # Prevent deleting the admin user
+            cursor.execute("SELECT is_admin FROM users WHERE username = ?", (user_to_delete,))
+            user = cursor.fetchone()
+            if user and user[0] == 1:
+                flash("Cannot delete admin user.", "danger")
+            else:
+                cursor.execute("DELETE FROM users WHERE username = ?", (user_to_delete,))
+                conn.commit()
+
+        cursor.execute("SELECT username, is_admin FROM users")
+        users = cursor.fetchall()
+
+    return render_template("users.html", users=users)
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'user_id' in session:
@@ -227,6 +294,7 @@ def login():
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['username'] = user['username']
+            session['is_admin'] = user['is_admin']  # or 'is_admin'
             flash('Login successful!', 'success')
             return redirect(url_for('index'))
         else:
