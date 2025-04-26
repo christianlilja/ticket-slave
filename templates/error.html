@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="text-danger">Oops!</h2>
+<p>{{ error }}</p>
+
+{% if details %}
+<pre class="bg-dark text-white p-2 mt-3 rounded">{{ details }}</pre>
+{% endif %}
+
+<a href="{{ url_for('index') }}" class="btn btn-outline-light mt-3">Return Home</a>
+{% endblock %}
