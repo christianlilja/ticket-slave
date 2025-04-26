@@ -47,7 +47,15 @@
         <label for="deadline" class="form-label">Deadline</label>
         <input type="datetime-local" name="deadline" id="deadline" class="form-control">
     </div>
-
+    <div class="mb-3">
+        <label for="notify_users" class="form-label">Notify Users</label>
+        <select id="notify_users" name="notify_users" class="form-select" multiple>
+          {% for user in users %}
+            <option value="{{ user['id'] }}">{{ user['username'] }}</option>
+          {% endfor %}
+        </select>
+        <small class="form-text text-muted">Hold Ctrl or Cmd to select multiple users</small>
+      </div>
     <button type="submit" class="btn btn-primary">Create Ticket</button>
     <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
 </form>

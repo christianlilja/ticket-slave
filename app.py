@@ -6,8 +6,10 @@ from jinja2 import TemplateNotFound, TemplateSyntaxError
 from contextlib import contextmanager
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from api import *
+from notifications import *
 import sqlite3
 import os
+import threading
 
 app = Flask(__name__)
 IS_PROD = os.environ.get('FLASK_ENV') == 'production'
@@ -84,6 +86,15 @@ def login_required(f):
         if 'user_id' not in session:
             flash("Please log in to access this page.", "warning")
             return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('is_admin'):
+            flash('Admin access required.', 'danger')
+            return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -247,13 +258,13 @@ def users():
         return redirect(url_for("index"))
 
     with get_db() as conn:
+        conn.row_factory = sqlite3.Row  # Important! Make rows dict-like
         cursor = conn.cursor()
 
         # Add user
         if request.method == "POST" and "new_username" in request.form:
             username = request.form["new_username"]
             password = generate_password_hash(request.form["new_password"])
-            # Set is_admin to 0 explicitly, since admin creation is disabled
             is_admin = 0
             try:
                 cursor.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)", (username, password, is_admin))
@@ -264,20 +275,68 @@ def users():
         # Delete user
         if request.method == "POST" and "delete_user" in request.form:
             user_to_delete = request.form["delete_user"]
-            # Prevent deleting the admin user
             cursor.execute("SELECT is_admin FROM users WHERE username = ?", (user_to_delete,))
             user = cursor.fetchone()
-            if user and user[0] == 1:
+            if user and user["is_admin"] == 1:
                 flash("Cannot delete admin user.", "danger")
             else:
                 cursor.execute("DELETE FROM users WHERE username = ?", (user_to_delete,))
                 conn.commit()
 
-        cursor.execute("SELECT username, is_admin FROM users")
+        cursor.execute("SELECT id, username, is_admin FROM users")
         users = cursor.fetchall()
 
     return render_template("users.html", users=users)
 
+@app.route('/notifications', methods=['GET', 'POST'])
+@login_required
+def notifications():
+    with get_db() as conn:
+        user = conn.execute('SELECT email, pushover_user_key, pushover_api_token FROM users WHERE username = ?', (session['username'],)).fetchone()
+
+        if request.method == 'POST':
+            email = request.form['email']
+            pushover_user_key = request.form['pushover_user_key']
+            pushover_api_token = request.form['pushover_api_token']
+
+            conn.execute('UPDATE users SET email = ?, pushover_user_key = ?, pushover_api_token = ? WHERE username = ?',
+                         (email, pushover_user_key, pushover_api_token, session['username']))
+            conn.commit()
+
+            # 🔥 Auto-test pushover notification
+            if pushover_user_key and pushover_api_token:
+                send_pushover_notification(
+                    pushover_user_key,
+                    pushover_api_token,
+                    title="Pushover Test",
+                    message="Your Pushover notification settings have been saved successfully!"
+                )
+
+            flash('Notification settings updated successfully.', 'success')
+            return redirect(url_for('notifications'))
+
+    return render_template('notifications.html', user=user)
+
+@app.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_user(user_id):
+    with get_db() as conn:
+        user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+
+        if not user:
+            abort(404)
+
+        if request.method == 'POST':
+            email = request.form['email']
+            pushover_user_key = request.form['pushover_user_key']
+            pushover_api_token = request.form['pushover_api_token']
+
+            conn.execute('UPDATE users SET email = ?, pushover_user_key = ?, pushover_api_token = ? WHERE id = ?', 
+                         (email, pushover_user_key, pushover_api_token, user_id))
+            conn.commit()
+            return redirect(url_for('users'))
+
+    return render_template('edit_user.html', user=user)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -338,6 +397,7 @@ def ticket_detail(ticket_id):
 def create_ticket():
     with get_db() as conn:
         queues = conn.execute("SELECT id, name FROM queues").fetchall()
+        users = conn.execute("SELECT id, username, email, pushover_user_key, pushover_api_token FROM users").fetchall()
 
         if request.method == 'POST':
             title = request.form['title']
@@ -347,26 +407,50 @@ def create_ticket():
             deadline = request.form['deadline']
             queue_id = request.form.get('queue_id')
             created_at = datetime.now().isoformat()
+            assigned_users = request.form.getlist('notify_users')  # <== get selected users
 
             if not title or not description:
                 flash("Both title and description are required.", "danger")
                 return redirect(url_for("create_ticket"))
             
             try:
-                conn.execute('''
+                cursor = conn.cursor()
+                cursor.execute('''
                     INSERT INTO tickets (title, description, status, priority, deadline, created_at, queue_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
                     (title, description, status, priority, deadline, created_at, queue_id))
+                ticket_id = cursor.lastrowid
+
+                # Notify selected users
+                def send_notifications(user_ids, title, description):
+                    with get_db() as conn:
+                        for user_id in user_ids:
+                            try:
+                                user = conn.execute('SELECT email, pushover_user_key, pushover_api_token FROM users WHERE id = ?', (user_id,)).fetchone()
+                                if user:
+                                    email, pushover_user_key, pushover_api_token = user
+                                    if pushover_user_key and pushover_api_token:
+                                        send_pushover_notification(
+                                            pushover_user_key,
+                                            pushover_api_token,
+                                            title=f"{ticket_id} - New Ticket: {title}",
+                                            message=description
+                                        )
+                            except Exception as e:
+                                current_app.logger.error(f"Notification error for user {user_id}: {e}")
+                
+                threading.Thread(target=send_notifications, args=(assigned_users, title, description), daemon=True).start()
+                
                 conn.commit()
                 flash('Ticket created successfully!', 'success')
                 return redirect(url_for('index'))
             except Exception as e:
                 current_app.logger.error(f"Error creating ticket: {e}")
                 flash('An error occurred while creating the ticket. Please try again.', 'danger')
-                # Re-render the form with user's previously entered data
                 return render_template(
                     'create_ticket.html',
                     queues=queues,
+                    users=users,  # <== pass users here too
                     title=title,
                     description=description,
                     status=status,
@@ -375,7 +459,8 @@ def create_ticket():
                     queue_id=queue_id
                 )
 
-    return render_template('create_ticket.html', queues=queues)
+    return render_template('create_ticket.html', queues=queues, users=users)
+
 
 @app.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
 @login_required

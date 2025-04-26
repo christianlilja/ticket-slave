@@ -22,6 +22,7 @@
                     {{ session['username'] }}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
+                  <a class="dropdown-item" href="{{ url_for('notifications') }}">Notifications Settings</a>
                     <li><a class="dropdown-item" href="/logout">Logout</a></li>
                 </ul>
             </div>
