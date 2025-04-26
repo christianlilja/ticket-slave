@@ -21,7 +21,12 @@
 <ul class="list-group mb-3">
     {% for comment in comments %}
     <li class="list-group-item">
-        <small class="text-muted">{{ comment['created_at'][:16].replace('T', ' ') }}</small><br>
+        <small class="text-muted">
+            {{ comment['created_at'][:16].replace('T', ' ') }}
+            {% if comment['username'] %}
+                by {{ comment['username'] }}
+            {% endif %}
+        </small><br>
         {{ comment['content'] }}
     </li>
     {% endfor %}

@@ -348,6 +348,10 @@ def create_ticket():
             queue_id = request.form.get('queue_id')
             created_at = datetime.now().isoformat()
 
+            if not title or not description:
+                flash("Both title and description are required.", "danger")
+                return redirect(url_for("create_ticket"))
+            
             try:
                 conn.execute('''
                     INSERT INTO tickets (title, description, status, priority, deadline, created_at, queue_id)
@@ -376,11 +380,23 @@ def create_ticket():
 @app.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
 @login_required
 def add_comment(ticket_id):
-    content = request.form['content']
+    content = request.form.get('content', '').strip()
+
+    if not content:
+        flash('Comment cannot be empty.', 'danger')
+        return redirect(url_for('ticket_detail', ticket_id=ticket_id))
+
     created_at = datetime.now().isoformat()
+    username = session.get('username')  # <- get the username from session
+
     with get_db() as conn:
-        conn.execute('INSERT INTO comments (ticket_id, content, created_at) VALUES (?, ?, ?)',
-                     (ticket_id, content, created_at))
+        conn.execute(
+            'INSERT INTO comments (ticket_id, content, created_at, username) VALUES (?, ?, ?, ?)',
+            (ticket_id, content, created_at, username)
+        )
+        conn.commit()
+
+    flash('Comment added successfully.', 'success')
     return redirect(url_for('ticket_detail', ticket_id=ticket_id))
 
 @app.route('/ticket/<int:ticket_id>/status', methods=['POST'])
