@@ -4,20 +4,18 @@ from datetime import datetime
 from functools import wraps
 from jinja2 import TemplateNotFound, TemplateSyntaxError
 from contextlib import contextmanager
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
-from api import *
-from notifications import *
 import sqlite3
 import os
-import threading
 
+from notifications import *
+
+# App setup
 app = Flask(__name__)
 IS_PROD = os.environ.get('FLASK_ENV') == 'production'
 
 if IS_PROD and not os.environ.get('SECRET_KEY'):
     raise RuntimeError("SECRET_KEY must be set in production")
 
-#Set variable in prod: export SECRET_KEY='a-very-strong-and-random-secret-key'
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
 
 DB_PATH = 'database.db'
@@ -28,8 +26,26 @@ def get_db():
     conn.row_factory = sqlite3.Row
     try:
         yield conn
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
     finally:
         conn.close()
+
+def load_settings():
+    with get_db() as conn:
+        settings = {}
+        for row in conn.execute('SELECT key, value FROM settings').fetchall():
+            settings[row['key']] = row['value']
+    return settings
+
+# Load settings globally
+settings = load_settings()
+
+# Conditionally load API if enabled
+if settings.get('enable_api') == '1':
+    import api
 
 def init_db():
     with get_db() as conn:
@@ -207,6 +223,15 @@ def index():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM settings WHERE key = 'allow_registration'")
+        setting = cur.fetchone()
+
+        if not setting or setting['value'] != '1':
+            flash('Registration is currently disabled.', 'warning')
+            return redirect(url_for('login'))
+
     if request.method == 'POST':
         username = request.form['username']
         password = generate_password_hash(request.form['password'])
@@ -219,11 +244,11 @@ def register():
                 return redirect(url_for('register'))
 
             cur.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
-            conn.commit()
             flash('Registered successfully. Please log in.', 'success')
             return redirect(url_for('login'))
 
     return render_template('register.html')
+
 
 @app.route('/create-admin')
 def create_admin():
@@ -253,7 +278,7 @@ def create_admin():
 
 @app.route("/users", methods=["GET", "POST"])
 @login_required
-def users():
+def manage_users():
     if not session.get("is_admin"):
         return redirect(url_for("index"))
 
@@ -317,6 +342,31 @@ def notifications():
 
     return render_template('notifications.html', user=user)
 
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    if not session.get('is_admin'):
+        return redirect(url_for('index'))
+
+    with get_db() as conn:
+        cur = conn.cursor()
+
+        if request.method == 'POST':
+            allow_registration = 1 if 'allow_registration' in request.form else 0
+            enable_api = 1 if 'enable_api' in request.form else 0
+
+            cur.execute("UPDATE settings SET value = ? WHERE key = 'allow_registration'", (allow_registration,))
+            cur.execute("UPDATE settings SET value = ? WHERE key = 'enable_api'", (enable_api,))
+            flash('Settings updated.', 'success')
+
+        # Load ALL settings into a dictionary
+        settings_data = {}
+        for row in cur.execute("SELECT key, value FROM settings").fetchall():
+            settings_data[row['key']] = row['value']
+
+    return render_template('settings.html', settings=settings_data)
+
+
 @app.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_user(user_id):
@@ -340,26 +390,34 @@ def edit_user(user_id):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if 'user_id' in session:
-        return redirect(url_for('index'))
+    allow_registration = True
 
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+    with get_db() as conn:
+        cur = conn.cursor()
 
-        with get_db() as conn:
-            user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        # Check setting BEFORE anything else
+        cur.execute("SELECT value FROM settings WHERE key = 'allow_registration'")
+        setting = cur.fetchone()
+        if setting and setting['value'] == '0':
+            allow_registration = False
 
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            session['is_admin'] = user['is_admin']  # or 'is_admin'
-            flash('Login successful!', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid username or password.', 'danger')
+        if request.method == 'POST':
+            username = request.form['username']
+            password = request.form['password']
 
-    return render_template('login.html')
+            cur.execute('SELECT * FROM users WHERE username = ?', (username,))
+            user = cur.fetchone()
+
+            if user and check_password_hash(user['password'], password):
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['is_admin'] = bool(user['is_admin'])
+                return redirect(url_for('index'))
+            else:
+                flash('Invalid credentials.', 'danger')
+
+    return render_template('login.html', allow_registration=allow_registration)
+
 
 @app.route('/logout')
 def logout():
@@ -439,7 +497,7 @@ def create_ticket():
                             except Exception as e:
                                 current_app.logger.error(f"Notification error for user {user_id}: {e}")
                 
-                threading.Thread(target=send_notifications, args=(assigned_users, title, description), daemon=True).start()
+                threading.Thread(target=send_notifications, args=(assigned_users, ticket_id, title, description), daemon=True).start()
                 
                 conn.commit()
                 flash('Ticket created successfully!', 'success')
@@ -487,9 +545,20 @@ def add_comment(ticket_id):
 @app.route('/ticket/<int:ticket_id>/status', methods=['POST'])
 @login_required
 def update_status(ticket_id):
-    status = request.form['status']
+    new_status = request.form['status']
     with get_db() as conn:
-        conn.execute('UPDATE tickets SET status=? WHERE id=?', (status, ticket_id))
+        conn.execute('UPDATE tickets SET status = ? WHERE id = ?', (new_status, ticket_id))
+    flash('Status updated successfully!', 'success')
+    return redirect(url_for('ticket_detail', ticket_id=ticket_id))
+
+
+@app.route('/ticket/<int:ticket_id>/priority', methods=['POST'])
+@login_required
+def update_priority(ticket_id):
+    new_priority = request.form['priority']
+    with get_db() as conn:
+        conn.execute('UPDATE tickets SET priority = ? WHERE id = ?', (new_priority, ticket_id))
+    flash('Priority updated successfully!', 'success')
     return redirect(url_for('ticket_detail', ticket_id=ticket_id))
 
 if __name__ == '__main__':

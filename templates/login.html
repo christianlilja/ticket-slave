@@ -14,7 +14,9 @@
       </div>
       <button type="submit" class="btn btn-primary">Login</button>
     </form>
-    <a href="{{ url_for('register') }}">Don't have an account? Register</a>
+    {% if allow_registration %}
+      <a href="{{ url_for('register') }}">Don't have an account? Register</a>
+  {% endif %}
   </div>
 </div>
 {% endblock %}

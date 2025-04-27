@@ -2,11 +2,21 @@
 {% block content %}
 <h2>Ticket #{{ ticket['id'] }} - {{ ticket['title'] }}</h2>
 <p>{{ ticket['description'] }}</p>
-<p><strong>Status:</strong> {{ ticket['status'] }}</p>
-<p><strong>Priority:</strong> {{ ticket['priority'] }}</p>
-<p><strong>Deadline:</strong> {{ ticket['deadline'] }}</p>
 
-<form method="post" action="/ticket/{{ ticket['id'] }}/status" class="mb-4">
+<p><strong>Deadline:</strong> {{ ticket['deadline'] }}</p>
+<p class="mb-1"><strong>Priority:</strong></p>
+<form method="post" action="/ticket/{{ ticket['id'] }}/priority" class="mb-4" style="max-width: 250px;">
+    <div class="input-group">
+        <select name="priority" class="form-select">
+            <option value="low" {% if ticket['priority'] == 'low' %}selected{% endif %}>Low</option>
+            <option value="medium" {% if ticket['priority'] == 'medium' %}selected{% endif %}>Medium</option>
+            <option value="high" {% if ticket['priority'] == 'high' %}selected{% endif %}>High</option>
+        </select>
+        <button type="submit" class="btn btn-outline-primary">Update priority</button>
+    </div>
+</form>
+<p class="mb-1"><strong>Status:</strong></p>
+<form method="post" action="/ticket/{{ ticket['id'] }}/status" class="mb-4" style="max-width: 250px;">
     <div class="input-group">
         <select name="status" class="form-select">
             <option value="open" {% if ticket['status'] == 'open' %}selected{% endif %}>Open</option>
