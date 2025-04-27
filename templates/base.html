@@ -55,5 +55,21 @@
       {% endfor %}
     {% endif %}
   {% endwith %}
+  <script>
+    // Wait for the DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Get all the alert elements
+      const alerts = document.querySelectorAll('.alert');
+  
+      // Loop through each alert and set a timer to fade out and remove it
+      alerts.forEach(function(alert) {
+        // Set a timer to remove the alert after 5 seconds (5000 milliseconds)
+        setTimeout(function() {
+          alert.classList.remove('show');
+          alert.classList.add('fade');
+        }, 500);  // Adjust this duration as needed (in milliseconds)
+      });
+    });
+  </script>
 </body>
 </html>

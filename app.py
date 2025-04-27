@@ -330,13 +330,12 @@ def notifications():
 
             # 🔥 Auto-test pushover notification
             if pushover_user_key and pushover_api_token:
-                send_pushover_notification(
-                    pushover_user_key,
-                    pushover_api_token,
-                    title="Pushover Test",
-                    message="Your Pushover notification settings have been saved successfully!"
-                )
-
+            # Start a new background thread for sending the Pushover notification
+                threading.Thread(
+                    target=send_pushover_notification,
+                    args=(pushover_user_key, pushover_api_token, "Pushover Test", "Your Pushover notification settings have been saved successfully!"),
+                    daemon=True
+                ).start()
             flash('Notification settings updated successfully.', 'success')
             return redirect(url_for('notifications'))
 
@@ -351,6 +350,13 @@ def settings():
     with get_db() as conn:
         cur = conn.cursor()
 
+        # Ensure all default settings exist
+        for key, default_value in DEFAULT_SETTINGS.items():
+            cur.execute("SELECT 1 FROM settings WHERE key = ?", (key,))
+            if not cur.fetchone():
+                cur.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (key, default_value))
+        conn.commit()
+
         if request.method == 'POST':
             allow_registration = 1 if 'allow_registration' in request.form else 0
             enable_api = 1 if 'enable_api' in request.form else 0
@@ -358,8 +364,9 @@ def settings():
             cur.execute("UPDATE settings SET value = ? WHERE key = 'allow_registration'", (allow_registration,))
             cur.execute("UPDATE settings SET value = ? WHERE key = 'enable_api'", (enable_api,))
             flash('Settings updated.', 'success')
+            return redirect(url_for('settings'))  # Good UX: reload page after POST
 
-        # Load ALL settings into a dictionary
+        # Load all settings into dictionary
         settings_data = {}
         for row in cur.execute("SELECT key, value FROM settings").fetchall():
             settings_data[row['key']] = row['value']
