@@ -2,18 +2,15 @@
 {% block content %}
 <h2>Manage Users</h2>
 
-<form method="post" class="mb-4">
-  <div class="row">
-    <div class="col-md-4">
-      <input type="text" name="new_username" class="form-control" placeholder="Username" required>
-    </div>
-    <div class="col-md-4">
-      <input type="password" name="new_password" class="form-control" placeholder="Password" required>
-    </div>
-    <div class="col-md-2"></div>
-    <div class="col-md-2">
-      <button type="submit" class="btn btn-primary">Add User</button>
-    </div>
+<form method="post" class="row g-2 mb-4 align-items-center">
+  <div class="col-md-4">
+    <input type="text" name="new_username" class="form-control" placeholder="Username" required>
+  </div>
+  <div class="col-md-4">
+    <input type="password" name="new_password" class="form-control" placeholder="Password" required>
+  </div>
+  <div class="col-md-4 d-grid">
+    <button type="submit" class="btn btn-primary">Add User</button>
   </div>
 </form>
 
@@ -30,16 +27,17 @@
     <tr>
       <td>{{ user['username'] }}</td>
       <td>{{ 'Yes' if user['is_admin'] else 'No' }}</td>
-      <td class="d-flex gap-2">
-        {% if not user['is_admin'] %}
-          <form method="post" style="display:inline;">
-            <input type="hidden" name="delete_user" value="{{ user['username'] }}">
-            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete user {{ user['username'] }}?')">Delete</button>
-          </form>
-          <a href="{{ url_for('edit_user', user_id=user['id']) }}" class="btn btn-sm btn-secondary">Edit</a>
-        {% else %}
-          <span class="text-muted">Admin</span>
-        {% endif %}
+      <td>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('edit_user', user_id=user['id']) }}" class="btn btn-sm btn-secondary p-1">Edit</a>
+      
+          {% if not user['is_admin'] %}
+            <form method="post" action="" onsubmit="return confirm('Delete user {{ user['username'] }}?')">
+              <input type="hidden" name="delete_user" value="{{ user['username'] }}">
+              <button type="submit" class="btn btn-sm btn-danger p-1">Delete</button>
+            </form>
+          {% endif %}
+        </div>
       </td>
     </tr>
     {% endfor %}

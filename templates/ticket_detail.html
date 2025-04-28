@@ -3,7 +3,9 @@
 <h2>Ticket #{{ ticket['id'] }} - {{ ticket['title'] }}</h2>
 <p>{{ ticket['description'] }}</p>
 
-<p><strong>Deadline:</strong> {{ ticket['deadline'] }}</p>
+<p><strong>Deadline:</strong> {{ ticket['deadline'] or "None" }}</p>
+
+<!-- Priority Update Form -->
 <p class="mb-1"><strong>Priority:</strong></p>
 <form method="post" action="/ticket/{{ ticket['id'] }}/priority" class="mb-4" style="max-width: 250px;">
     <div class="input-group">
@@ -15,6 +17,24 @@
         <button type="submit" class="btn btn-outline-primary">Update priority</button>
     </div>
 </form>
+
+<!-- Assigned To Update Form -->
+<p class="mb-1"><strong>Assigned To:</strong></p>
+<form method="post" action="/ticket/{{ ticket['id'] }}/assign" class="mb-4" style="max-width: 300px;">
+    <div class="input-group">
+        <select name="assigned_to" id="assigned_to" class="form-select">
+            <option value="">Unassigned</option>
+            {% for user in users %}
+                <option value="{{ user['id'] }}" {% if ticket['assigned_to'] == user['id'] %}selected{% endif %}>
+                    {{ user['username'] }}
+                </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-outline-primary">Update assigned user</button>
+    </div>
+</form>
+
+<!-- Status Update Form -->
 <p class="mb-1"><strong>Status:</strong></p>
 <form method="post" action="/ticket/{{ ticket['id'] }}/status" class="mb-4" style="max-width: 250px;">
     <div class="input-group">
@@ -27,6 +47,7 @@
     </div>
 </form>
 
+<!-- Comments Section -->
 <h4>Comments</h4>
 <ul class="list-group mb-3">
     {% for comment in comments %}
@@ -42,6 +63,7 @@
     {% endfor %}
 </ul>
 
+<!-- New Comment Form -->
 <form method="post" action="/ticket/{{ ticket['id'] }}/comment">
     <div class="mb-3">
         <label for="content" class="form-label">New comment</label>

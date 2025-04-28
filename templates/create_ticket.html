@@ -1,11 +1,8 @@
-<!-- templates/create_ticket.html -->
 {% extends "base.html" %}
-
-{% block title %}Create Ticket{% endblock %}
-
 {% block content %}
 <h2>Create Ticket</h2>
-<form method="post">
+
+<form method="post" action="{{ url_for('create_ticket') }}">
     <div class="mb-3">
         <label for="title" class="form-label">Title</label>
         <input type="text" name="title" id="title" class="form-control" required>
@@ -13,7 +10,7 @@
 
     <div class="mb-3">
         <label for="description" class="form-label">Description</label>
-        <textarea name="description" id="description" required class="form-control" rows="8" style="resize: vertical; required"></textarea>
+        <textarea name="description" id="description" class="form-control" rows="5" required></textarea>
     </div>
 
     <div class="mb-3">
@@ -28,18 +25,20 @@
     <div class="mb-3">
         <label for="queue_id" class="form-label">Queue</label>
         <select name="queue_id" id="queue_id" class="form-select">
+            <option value="">Select a queue (optional)</option>
             {% for queue in queues %}
-            <option value="{{ queue['id'] }}">{{ queue['name'] }}</option>
+                <option value="{{ queue['id'] }}">{{ queue['name'] }}</option>
             {% endfor %}
         </select>
     </div>
 
-    <div class="mb-3">
-        <label for="status" class="form-label">Status</label>
-        <select name="status" id="status" class="form-select">
-            <option value="open" selected>Open</option>
-            <option value="in progress">In Progress</option>
-            <option value="closed">Closed</option>
+    <div class="mb-4">
+        <label for="assigned_to" class="form-label">Assign To</label>
+        <select name="assigned_to" id="assigned_to" class="form-select">
+            <option value="">Unassigned</option>
+            {% for user in users %}
+                <option value="{{ user['id'] }}">{{ user['username'] }}</option>
+            {% endfor %}
         </select>
     </div>
 
@@ -47,17 +46,8 @@
         <label for="deadline" class="form-label">Deadline</label>
         <input type="datetime-local" name="deadline" id="deadline" class="form-control">
     </div>
-    <div class="mb-3">
-        <label for="notify_users" class="form-label">Notify Users</label>
-        <select id="notify_users" name="notify_users" class="form-select" multiple>
-          {% for user in users %}
-            <option value="{{ user['id'] }}">{{ user['username'] }}</option>
-          {% endfor %}
-        </select>
-        <small class="form-text text-muted">Hold Ctrl or Cmd to select multiple users</small>
-      </div>
+
     <button type="submit" class="btn btn-primary">Create Ticket</button>
     <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
 </form>
 {% endblock %}
-

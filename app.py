@@ -20,6 +20,20 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
 
 DB_PATH = 'database.db'
 
+DEFAULT_SETTINGS = {
+    'allow_registration': {
+        'default': '0',
+        'label': 'Allow new users to register',
+        'type': 'checkbox'
+    },
+    'enable_api': {
+        'default': '0',
+        'label': 'Enable API',
+        'type': 'checkbox'
+    },
+    # Easy to add more settings here
+}
+
 @contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -148,7 +162,7 @@ def index():
     sort_columns = {
         'created_at': 'tickets.created_at DESC',
         'deadline': 'tickets.deadline DESC',
-        'priority': '''CASE LOWER(priority)
+        'priority': '''CASE LOWER(tickets.priority)
                         WHEN 'high' THEN 1
                         WHEN 'medium' THEN 2
                         WHEN 'low' THEN 3
@@ -160,12 +174,14 @@ def index():
     base_query = '''
         FROM tickets
         LEFT JOIN queues ON tickets.queue_id = queues.id
+        LEFT JOIN users ON tickets.assigned_to = users.id
     '''
     where_clause = ''
     if not show_closed:
-        where_clause = ' WHERE LOWER(tickets.status) != "closed"'
+        where_clause = 'WHERE LOWER(tickets.status) != "closed"'
 
     count_query = f'SELECT COUNT(*) {base_query} {where_clause}'
+
     with get_db() as conn:
         total = conn.execute(count_query).fetchone()[0]
 
@@ -173,7 +189,10 @@ def index():
     offset = (page - 1) * per_page
 
     query = f'''
-        SELECT tickets.*, queues.name AS queue
+        SELECT 
+            tickets.*, 
+            queues.name AS queue,
+            users.username AS assigned_to_username
         {base_query}
         {where_clause}
         ORDER BY {order_by_clause}
@@ -209,7 +228,8 @@ def index():
                 'created_at': row['created_at'],
                 'created_at_formatted': created_at_formatted,
                 'is_overdue': is_overdue,
-                'queue': row['queue']
+                'queue': row['queue'],
+                'assigned_to': row['assigned_to_username'] or "Unassigned"  # <-- NEW
             })
 
     return render_template(
@@ -220,6 +240,7 @@ def index():
         page=page,
         total_pages=total_pages
     )
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -387,13 +408,59 @@ def edit_user(user_id):
             email = request.form['email']
             pushover_user_key = request.form['pushover_user_key']
             pushover_api_token = request.form['pushover_api_token']
+            new_password = request.form.get('new_password')
 
-            conn.execute('UPDATE users SET email = ?, pushover_user_key = ?, pushover_api_token = ? WHERE id = ?', 
-                         (email, pushover_user_key, pushover_api_token, user_id))
+            # Always update email and pushover fields
+            conn.execute(
+                'UPDATE users SET email = ?, pushover_user_key = ?, pushover_api_token = ? WHERE id = ?', 
+                (email, pushover_user_key, pushover_api_token, user_id)
+            )
+
+            # Only update password if a new password was entered
+            if new_password:
+                hashed_password = generate_password_hash(new_password)
+                conn.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_password, user_id))
+
             conn.commit()
-            return redirect(url_for('users'))
+            flash('User updated successfully.', 'success')
+            return redirect(url_for('manage_users'))
 
     return render_template('edit_user.html', user=user)
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    user_id = session.get('user_id')
+
+    with get_db() as conn:
+        user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+
+        if not user:
+            abort(404)
+
+        if request.method == 'POST':
+            email = request.form['email']
+            pushover_user_key = request.form['pushover_user_key']
+            pushover_api_token = request.form['pushover_api_token']
+            new_password = request.form.get('new_password')
+
+            # Always update email and pushover fields
+            conn.execute(
+                'UPDATE users SET email = ?, pushover_user_key = ?, pushover_api_token = ? WHERE id = ?',
+                (email, pushover_user_key, pushover_api_token, user_id)
+            )
+
+            # Only update password if a new password was entered
+            if new_password:
+                hashed_password = generate_password_hash(new_password)
+                conn.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_password, user_id))
+
+            conn.commit()
+            flash('Profile updated successfully.', 'success')
+            return redirect(url_for('profile'))
+
+    return render_template('profile.html', user=user)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -451,74 +518,62 @@ def ticket_detail(ticket_id):
     with get_db() as conn:
         ticket = conn.execute('SELECT * FROM tickets WHERE id = ?', (ticket_id,)).fetchone()
         comments = conn.execute('SELECT * FROM comments WHERE ticket_id = ?', (ticket_id,)).fetchall()
-
+        users = conn.execute('SELECT id, username FROM users').fetchall()
+        
     if ticket is None:
         abort(404)
 
-    return render_template('ticket_detail.html', ticket=ticket, comments=comments)
+    return render_template('ticket_detail.html', ticket=ticket, comments=comments, users=users)
+
+@app.route('/ticket/<int:ticket_id>/assign', methods=['POST'])
+@login_required
+def update_assigned_to(ticket_id):
+    assigned_to = request.form.get('assigned_to') or None
+    with get_db() as conn:
+        conn.execute('UPDATE tickets SET assigned_to = ? WHERE id = ?', (assigned_to, ticket_id))
+    return redirect(url_for('ticket_detail', ticket_id=ticket_id))
 
 @app.route('/create', methods=['GET', 'POST'])
 @login_required
 def create_ticket():
     with get_db() as conn:
         queues = conn.execute("SELECT id, name FROM queues").fetchall()
-        users = conn.execute("SELECT id, username, email, pushover_user_key, pushover_api_token FROM users").fetchall()
+        users = conn.execute("SELECT id, username FROM users").fetchall()  # You probably only need username here
 
         if request.method == 'POST':
             title = request.form['title']
             description = request.form['description']
-            status = request.form['status']
             priority = request.form['priority']
             deadline = request.form['deadline']
             queue_id = request.form.get('queue_id')
+            assigned_to = request.form.get('assigned_to') or None  # User assignment
             created_at = datetime.now().isoformat()
-            assigned_users = request.form.getlist('notify_users')  # <== get selected users
+            status = 'open'  # Always open for new tickets
 
             if not title or not description:
                 flash("Both title and description are required.", "danger")
                 return redirect(url_for("create_ticket"))
-            
+
             try:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    INSERT INTO tickets (title, description, status, priority, deadline, created_at, queue_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                    (title, description, status, priority, deadline, created_at, queue_id))
-                ticket_id = cursor.lastrowid
-
-                # Notify selected users
-                def send_notifications(user_ids, title, description):
-                    with get_db() as conn:
-                        for user_id in user_ids:
-                            try:
-                                user = conn.execute('SELECT email, pushover_user_key, pushover_api_token FROM users WHERE id = ?', (user_id,)).fetchone()
-                                if user:
-                                    email, pushover_user_key, pushover_api_token = user
-                                    if pushover_user_key and pushover_api_token:
-                                        send_pushover_notification(
-                                            pushover_user_key,
-                                            pushover_api_token,
-                                            title=f"{ticket_id} - New Ticket: {title}",
-                                            message=description
-                                        )
-                            except Exception as e:
-                                current_app.logger.error(f"Notification error for user {user_id}: {e}")
-                
-                threading.Thread(target=send_notifications, args=(assigned_users, ticket_id, title, description), daemon=True).start()
-                
+                    INSERT INTO tickets (title, description, status, priority, deadline, created_at, queue_id, assigned_to)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                    (title, description, status, priority, deadline, created_at, queue_id, assigned_to))
                 conn.commit()
+
                 flash('Ticket created successfully!', 'success')
                 return redirect(url_for('index'))
+
             except Exception as e:
                 current_app.logger.error(f"Error creating ticket: {e}")
                 flash('An error occurred while creating the ticket. Please try again.', 'danger')
                 return render_template(
                     'create_ticket.html',
                     queues=queues,
-                    users=users,  # <== pass users here too
+                    users=users,
                     title=title,
                     description=description,
-                    status=status,
                     priority=priority,
                     deadline=deadline,
                     queue_id=queue_id
