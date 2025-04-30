@@ -7,13 +7,29 @@
     <label>Email address</label>
     <input type="email" name="email" class="form-control" value="{{ user['email'] or '' }}">
   </div>
-  <div class="mb-3">
+
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="notify_email" id="notify_email"
+           {% if user['notify_email'] %}checked{% endif %}>
+    <label class="form-check-label" for="notify_email">
+      Receive email notifications
+    </label>
+  </div>
+    <div class="mb-3">
     <label>Pushover User Key</label>
     <input type="text" name="pushover_user_key" class="form-control" value="{{ user['pushover_user_key'] or '' }}">
   </div>
   <div class="mb-3">
     <label>Pushover API Token</label>
     <input type="text" name="pushover_api_token" class="form-control" value="{{ user['pushover_api_token'] or '' }}">
+  </div>
+
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="notify_pushover" id="notify_pushover"
+           {% if user['notify_pushover'] %}checked{% endif %}>
+    <label class="form-check-label" for="notify_pushover">
+      Receive Pushover notifications
+    </label>
   </div>
 
   <hr>

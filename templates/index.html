@@ -41,7 +41,7 @@
             <th>Priority</th>
             <th>Deadline</th>
             <th>Queue</th>
-            <th>Assigned To</th> <!-- Added -->
+            <th>Assigned</th>
         </tr>
     </thead>
     <tbody>
@@ -75,16 +75,15 @@
             <td>{{ ticket.queue or "Unassigned" }}</td>
             <td>
                 {% if ticket.assigned_to %}
-                    <span class="badge bg-success">{{ ticket.assigned_to }}</span>
+                    <span class="">{{ ticket.assigned_to }}</span>
                 {% else %}
-                    <span class="badge bg-secondary">Unassigned</span>
+                    <span class="">Unassigned</span>
                 {% endif %}
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
-
 
 {% if total_pages > 1 %}
 <nav aria-label="Page navigation">

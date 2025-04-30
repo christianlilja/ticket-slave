@@ -2,7 +2,7 @@
 {% block content %}
 <h2>Create Ticket</h2>
 
-<form method="post" action="{{ url_for('create_ticket') }}">
+<form method="post" action="{{ url_for('create_ticket') }}" enctype="multipart/form-data">
     <div class="mb-3">
         <label for="title" class="form-label">Title</label>
         <input type="text" name="title" id="title" class="form-control" required>
@@ -46,6 +46,11 @@
         <label for="deadline" class="form-label">Deadline</label>
         <input type="datetime-local" name="deadline" id="deadline" class="form-control">
     </div>
+
+    <div class="mb-3">
+        <label for="file" class="form-label">Attach a file (optional)</label>
+        <input type="file" name="file" class="form-control">
+      </div>
 
     <button type="submit" class="btn btn-primary">Create Ticket</button>
     <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>

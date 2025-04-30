@@ -14,6 +14,40 @@
             Enable API
         </label>
     </div>
+    <hr>
+
+<h4>Email Server Configuration</h4>
+<div class="mb-3">
+  <label for="smtp_server" class="form-label">SMTP Server</label>
+  <input type="text" class="form-control" name="smtp_server" id="smtp_server" value="{{ settings['smtp_server'] or '' }}">
+</div>
+<div class="mb-3">
+  <label for="smtp_port" class="form-label">SMTP Port</label>
+  <input type="number" class="form-control" name="smtp_port" id="smtp_port" value="{{ settings['smtp_port'] or '25' }}">
+</div>
+<div class="mb-3">
+  <label for="smtp_from_email" class="form-label">From Email Address</label>
+  <input type="email" class="form-control" name="smtp_from_email" id="smtp_from_email" value="{{ settings['smtp_from_email'] or '' }}">
+</div>
+
+<div class="mb-3">
+  <label for="smtp_username" class="form-label">SMTP Username (optional)</label>
+  <input type="text" class="form-control" name="smtp_username" id="smtp_username" value="{{ settings['smtp_username'] or '' }}">
+</div>
+<div class="mb-3">
+  <label for="smtp_password" class="form-label">SMTP Password (optional)</label>
+  <input type="password" class="form-control" name="smtp_password" id="smtp_password" value="{{ settings['smtp_password'] or '' }}">
+</div>
+
+<div class="form-check mb-3">
+  <input class="form-check-input" type="checkbox" name="smtp_use_tls" id="smtp_use_tls"
+         {% if settings['smtp_use_tls'] == '1' %}checked{% endif %}>
+  <label class="form-check-label" for="smtp_use_tls">
+    Use TLS
+  </label>
+</div>
+  
     <button type="submit" class="btn btn-primary mt-3">Save Settings</button>
-</form>
+  </form>
+  
 {% endblock %}

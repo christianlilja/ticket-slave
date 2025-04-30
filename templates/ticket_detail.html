@@ -47,6 +47,20 @@
     </div>
 </form>
 
+{% if attachments %}
+<h5>Attachments</h5>
+<ul>
+  {% for file in attachments %}
+    <li>
+      <a href="{{ url_for('download_attachment', filename=file['stored_filename']) }}">
+        {{ file['original_filename'] }}
+      </a>
+      <small class="text-muted">({{ file['size_kb'] }} KB)</small>
+    </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
 <!-- Comments Section -->
 <h4>Comments</h4>
 <ul class="list-group mb-3">
