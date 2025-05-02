@@ -3,20 +3,26 @@
 {% block content %}
 <h2 class="mb-4">Tickets</h2>
 
-<div class="mb-3 d-flex justify-content-between align-items-center">
-    <form method="get" action="{{ url_for('index') }}" class="d-flex align-items-center gap-2">
-        <select name="sort_by" class="form-select">
+<form method="get" action="{{ url_for('index') }}" class="d-flex align-items-center gap-2 mb-3" id="filterForm">
+    <div style="min-width: 200px;">
+        <select name="sort_by" class="form-select form-select-sm">
             <option value="priority" {% if sort_by == 'priority' %}selected{% endif %}>Sort by Priority</option>
             <option value="deadline" {% if sort_by == 'deadline' %}selected{% endif %}>Sort by Deadline</option>
             <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Sort by Created</option>
+            <option value="queue" {% if sort_by == 'queue' %}selected{% endif %}>Sort by Queue</option>
+            <option value="assigned_to" {% if sort_by == 'assigned_to' %}selected{% endif %}>Sort by Assigned</option>
         </select>
-        <button type="submit" class="btn btn-outline-light">Sort</button>
-    </form>
-</div>
+    </div>
+    <button type="submit" class="btn btn-outline-light btn-sm">Sort</button>
+
+    <!-- Hidden to persist checkbox states -->
+    <input type="hidden" name="show_closed" value="{{ 'true' if show_closed else 'false' }}">
+    <input type="hidden" name="assigned_only" value="{{ 'true' if assigned_only else 'false' }}">
+</form>
 
 <form method="get" id="toggleClosedForm">
     <input type="hidden" name="sort_by" value="{{ sort_by }}">
-    <div class="form-check">
+    <div class="form-check mb-2">
         <input 
             class="form-check-input" 
             type="checkbox" 
@@ -30,9 +36,23 @@
             Show Closed Tickets
         </label>
     </div>
+    <div class="form-check">
+        <input 
+            class="form-check-input"
+            type="checkbox"
+            name="assigned_only"
+            id="assigned_only"
+            value="true"
+            {% if assigned_only %}checked{% endif %}
+            onchange="document.getElementById('toggleClosedForm').submit()"
+        >
+        <label class="form-check-label" for="assigned_only">
+            Show Only My Tickets
+        </label>
+    </div>
 </form>
 
-<table class="table table-dark table-hover">
+<table class="table table-dark table-hover mt-3">
     <thead>
         <tr>
             <th>ID</th>
@@ -73,13 +93,7 @@
                 {% endif %}
             </td>
             <td>{{ ticket.queue or "Unassigned" }}</td>
-            <td>
-                {% if ticket.assigned_to %}
-                    <span class="">{{ ticket.assigned_to }}</span>
-                {% else %}
-                    <span class="">Unassigned</span>
-                {% endif %}
-            </td>
+            <td>{{ ticket.assigned_to or "Unassigned" }}</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -90,19 +104,19 @@
     <ul class="pagination justify-content-center">
         {% if page > 1 %}
         <li class="page-item">
-            <a class="page-link" href="{{ url_for('index', page=page-1, sort_by=sort_by, show_closed=show_closed) }}">Previous</a>
+            <a class="page-link" href="{{ url_for('index', page=page-1, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">Previous</a>
         </li>
         {% endif %}
 
         {% for p in range(1, total_pages + 1) %}
         <li class="page-item {% if p == page %}active{% endif %}">
-            <a class="page-link" href="{{ url_for('index', page=p, sort_by=sort_by, show_closed=show_closed) }}">{{ p }}</a>
+            <a class="page-link" href="{{ url_for('index', page=p, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">{{ p }}</a>
         </li>
         {% endfor %}
 
         {% if page < total_pages %}
         <li class="page-item">
-            <a class="page-link" href="{{ url_for('index', page=page+1, sort_by=sort_by, show_closed=show_closed) }}">Next</a>
+            <a class="page-link" href="{{ url_for('index', page=page+1, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">Next</a>
         </li>
         {% endif %}
     </ul>
