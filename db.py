@@ -60,11 +60,13 @@ def init_db():
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
                 email TEXT,
+                apprise_url TEXT,
                 pushover_user_key TEXT,
                 pushover_api_token TEXT,
                 is_admin INTEGER DEFAULT 0,
                 notify_email INTEGER DEFAULT 0,
-                notify_pushover INTEGER DEFAULT 0
+                notify_pushover INTEGER DEFAULT 0,
+                notify_apprise INTEGER DEFAULT 0
             )
         """)
 

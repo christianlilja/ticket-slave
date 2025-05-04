@@ -1,0 +1,48 @@
+      :root[data-bs-theme='light'] {
+          body {
+              background-color: #f8f9fa; /* Bootstrap light bg */
+              color: #212529;            /* Bootstrap dark text */
+          }
+      
+          .btn-outline-light {
+              color: #212529;
+              border-color: #ced4da;
+          }
+      
+          .btn-outline-light:hover {
+              background-color: #e9ecef;
+              border-color: #adb5bd;
+          }
+      
+          .btn-light {
+              color: #212529;
+              background-color: #f8f9fa;
+              border-color: #ced4da;
+          }
+      
+          .btn-light:hover {
+              background-color: #e2e6ea;
+          }
+      
+          .bg-dark {
+              background-color: #f8f9fa !important;
+          }
+      
+          .text-white {
+              color: #212529 !important;
+          }
+      
+          .dropdown-menu {
+              background-color: #ffffff;
+              color: #212529;
+          }
+      
+          .dropdown-item {
+              color: #212529;
+          }
+      
+          .dropdown-item:hover {
+              background-color: #f1f1f1;
+          }
+      }
+     

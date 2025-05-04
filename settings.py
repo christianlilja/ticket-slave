@@ -48,15 +48,40 @@ DEFAULT_SETTINGS = {
         'type': 'checkbox'
     },
     'admin_username': {
-        'default': 'admin', 
-        'label': 'Default admin username', 
+        'default': 'admin',
+        'label': 'Default admin username',
         'type': 'text'
     },
     'admin_password': {
-        'default': 'changeme', 
-        'label': 'Default admin password', 
-        'type': 'password'},
-
+        'default': 'changeme',
+        'label': 'Default admin password',
+        'type': 'password'
+    },
+    'theme': {
+        'default': 'dark',
+        'label': 'Default Theme',
+        'type': 'text'
+    },
+    'notify_email': {
+        'default': '0',
+        'label': 'Enable Email Notifications',
+        'type': 'checkbox'
+    },
+    'notify_pushover': {
+        'default': '0',
+        'label': 'Enable Pushover Notifications',
+        'type': 'checkbox'
+    },
+    'notify_apprise': {
+        'default': '0',
+        'label': 'Enable Apprise Notifications',
+        'type': 'checkbox'
+    },
+    'apprise_url': {
+        'default': '',
+        'label': 'Apprise URL',
+        'type': 'text'
+    }
 }
 
 @contextmanager

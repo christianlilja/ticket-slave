@@ -3,7 +3,7 @@ from email.mime.text import MIMEText
 import requests
 import os
 import logging
-import threading
+from apprise import apprise
 
 # Optional: Setup a simple logger
 logger = logging.getLogger(__name__)
@@ -45,3 +45,13 @@ def send_pushover_notification(user_key, api_token, title, message):
         response.raise_for_status()  # Raises exception if bad response
     except requests.RequestException as e:
         print(f"Pushover notification failed: {e}")
+
+def send_apprise_notification(apprise_url, title, body):
+    try:
+        apobj = Apprise()
+        apobj.add(apprise_url)
+        success = apobj.notify(title=title, body=body)
+        if not success:
+            print("Apprise notification failed to send.")
+    except Exception as e:
+        print(f"Apprise notification error: {e}")

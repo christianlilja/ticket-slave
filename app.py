@@ -6,10 +6,10 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from functools import wraps
 from jinja2 import TemplateNotFound, TemplateSyntaxError
-from contextlib import contextmanager
+#from contextlib import contextmanager
 import sqlite3
 import os
-from notifications import *
+from notifications import send_pushover_notification, send_email_notification, send_apprise_notification
 
 # App setup
 app = Flask(__name__)
@@ -326,6 +326,13 @@ def notifications():
                     daemon=True
                 ).start()
 
+            if notify_apprise and apprise_url:
+                threading.Thread(
+                    target=send_apprise_notification,
+                    args=(apprise_url, "Apprise Test", "Your Apprise settings have been saved."),
+                    daemon=True
+                ).start()
+
             flash('Notification settings updated successfully.', 'success')
             return redirect(url_for('notifications'))
 
@@ -422,14 +429,16 @@ def profile():
             notify_email = 1 if 'notify_email' in request.form else 0
             notify_pushover = 1 if 'notify_pushover' in request.form else 0
             new_password = request.form.get('new_password')
-
+            apprise_url = request.form['apprise_url']
+            notify_apprise = 1 if 'notify_apprise' in request.form else 0
+            
             conn.execute(
                 '''UPDATE users
                    SET email = ?, pushover_user_key = ?, pushover_api_token = ?,
-                       notify_email = ?, notify_pushover = ?
+                       notify_email = ?, notify_pushover = ?, apprise_url = ?, notify_apprise = ?
                    WHERE id = ?''',
                 (email, pushover_user_key, pushover_api_token,
-                 notify_email, notify_pushover, user_id)
+                 notify_email, notify_pushover, apprise_url, notify_apprise, user_id)
             )
 
             if new_password:
