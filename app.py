@@ -28,6 +28,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB limit
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'docx', 'txt'}
 
+APP_VERSION = "v1.0"
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -97,6 +99,9 @@ def notify_assigned_user(ticket_id, event_type, user_id):
                 body=message
             )
 
+@app.context_processor
+def inject_version():
+    return dict(app_version=APP_VERSION)
 
 @app.errorhandler(TemplateNotFound)
 def handle_template_not_found(e):
@@ -455,6 +460,22 @@ def profile():
 
     return render_template('profile.html', user=user)
 
+@app.route('/toggle_theme', methods=['POST'])
+@login_required
+def toggle_theme():
+    current_theme = session.get('theme', 'dark')
+    new_theme = 'light' if current_theme == 'dark' else 'dark'
+
+    session['theme'] = new_theme
+
+    # Persist theme to DB
+    user_id = session.get('user_id')
+    with get_db() as conn:
+        conn.execute('UPDATE users SET theme = ? WHERE id = ?', (new_theme, user_id))
+        conn.commit()
+
+    return redirect(request.referrer or url_for('index'))
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     allow_registration = True
@@ -479,6 +500,7 @@ def login():
                 session['user_id'] = user['id']
                 session['username'] = user['username']
                 session['is_admin'] = bool(user['is_admin'])
+                session['theme'] = user['theme'] 
                 return redirect(url_for('index'))
             else:
                 flash('Invalid credentials.', 'danger')
@@ -554,7 +576,7 @@ def update_assigned_to(ticket_id):
     with get_db() as conn:
         conn.execute('UPDATE tickets SET assigned_to = ? WHERE id = ?', (assigned_to, ticket_id))
     if assigned_to:
-        threading.Thread(target=notify_assigned_user, args=(ticket_id, 'assigned'), daemon=True).start()
+        threading.Thread(target=notify_assigned_user, args=(ticket_id, 'assigned', session['user_id']), daemon=True).start()
     flash('Assigned user updated successfully!', 'success')
     return redirect(url_for('ticket_detail', ticket_id=ticket_id))
 
