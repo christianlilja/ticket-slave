@@ -10,6 +10,7 @@ from jinja2 import TemplateNotFound, TemplateSyntaxError
 import sqlite3
 import os
 from notifications import send_pushover_notification, send_email_notification, send_apprise_notification
+import threading
 
 # App setup
 app = Flask(__name__)
@@ -309,16 +310,18 @@ def notifications():
             pushover_api_token = request.form['pushover_api_token']
             notify_email = 1 if 'notify_email' in request.form else 0
             notify_pushover = 1 if 'notify_pushover' in request.form else 0
-
+            apprise_url = request.form['apprise_url']
+            notify_apprise = 1 if 'notify_apprise' in request.form else 0
+            
             conn.execute('''
                 UPDATE users 
                 SET email = ?, pushover_user_key = ?, pushover_api_token = ?, 
-                    notify_email = ?, notify_pushover = ?
+                    notify_email = ?, notify_pushover = ?, apprise_url = ?, notify_apprise = ?
                 WHERE username = ?
-            ''', (email, pushover_user_key, pushover_api_token, notify_email, notify_pushover, session['username']))
+            ''', (email, pushover_user_key, pushover_api_token, notify_email, notify_pushover, apprise_url, notify_apprise, session['username']))
             conn.commit()
 
-            # Optional: send test notification if pushover enabled
+           # Optional: send test notification if pushover enabled
             if notify_pushover and pushover_user_key and pushover_api_token:
                 threading.Thread(
                     target=send_pushover_notification,

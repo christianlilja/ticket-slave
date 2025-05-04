@@ -4,7 +4,6 @@ import requests
 import os
 import logging
 from apprise import apprise
-
 # Optional: Setup a simple logger
 logger = logging.getLogger(__name__)
 
