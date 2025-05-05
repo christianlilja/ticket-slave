@@ -10,6 +10,8 @@ import sqlite3
 import os
 from notifications import send_pushover_notification, send_email_notification, send_apprise_notification
 import threading
+#from flask_wtf.csrf import CSRFProtect
+#csrf = CSRFProtect(app)
 
 # App setup
 app = Flask(__name__)
@@ -21,6 +23,10 @@ if app.secret_key == 'dev-secret-key':
     app.logger.warning("Running with default secret key. Not recommended for production.")
 
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
+
+#app.config['SESSION_COOKIE_SECURE'] = True  # Ensures cookies are only sent over HTTPS
+#app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevents JavaScript from accessing cookies
+#app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Mitigates CSRF
 
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -114,6 +120,7 @@ def inject_version():
 
 @app.errorhandler(TemplateNotFound)
 def handle_template_not_found(e):
+    current_app.logger.error(f"TemplateNotFound: {e}")
     return render_template("error.html", error="Template not found", details=str(e)), 500
 
 @app.errorhandler(TemplateSyntaxError)
@@ -121,6 +128,11 @@ def handle_template_syntax_error(e):
     current_app.logger.error(f"Template syntax error: {e}")
     msg = "There is a syntax issue in one of the templates."
     return render_template("error.html", error=msg), 500
+
+@app.errorhandler(403)
+def forbidden_error(e):
+    current_app.logger.warning(f"403 Error: {e}")
+    return render_template("error.html", error="Forbidden Access (403)"), 403  # Correct status code
 
 @app.errorhandler(404)
 def not_found_error(e):
@@ -134,6 +146,7 @@ def internal_error(e):
         return render_template("error.html", error="Internal Server Error (500)", details=str(e)), 500
     else:
         return render_template("error.html", error="Something went wrong on our end."), 500
+
     
 
 @app.route("/")

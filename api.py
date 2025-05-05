@@ -1,4 +1,4 @@
-from app import app, get_db
+from app import app, get_db, settings
 from datetime import datetime
 from flask import request, jsonify
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
@@ -76,6 +76,52 @@ def api_create_ticket():
         conn.commit()
 
     return {'msg': 'Ticket created successfully'}, 201
+
+@app.route('/api/webhook/create-ticket', methods=['POST'])
+def create_ticket_from_webhook():
+    """Create a ticket from Uptime Kuma webhook"""
+    # Ensure that the request is in JSON format
+    if not request.is_json:
+        return jsonify({"msg": "Invalid content type, expected JSON"}), 400
+
+    # Get the JSON data sent by Uptime Kuma
+    data = request.get_json()
+
+    # Extract necessary fields from the webhook data
+    monitor_name = data.get("monitor_name")
+    status = data.get("status")  # e.g., 'down' or 'up'
+    message = data.get("message")  # Alert message, why the monitor is down or up
+    timestamp = data.get("timestamp")  # Timestamp of the alert
+
+    # Set default values or handle missing data (for instance, "up" as default status)
+    created_at = datetime.now().isoformat()
+    ticket_title = f"Uptime Kuma Alert - {monitor_name} is {status}"
+    ticket_description = f"Status: {status}\nMessage: {message}\nTimestamp: {timestamp}"
+
+    # Example: Set priority to "high" if the status is "down"
+    priority = "high" if status == "down" else "low"
+
+    # Assuming you have a default queue_id, or you can dynamically assign it
+    queue_id = 1  # Adjust this according to your logic or config
+
+    # Insert the new ticket into the database using your existing logic
+    try:
+        with get_db() as conn:
+            conn.execute(''' 
+                INSERT INTO tickets (title, description, status, priority, deadline, created_at, queue_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                ticket_title, ticket_description, "open",  # Default status is 'open'
+                priority, None, created_at, queue_id
+            ))
+            conn.commit()
+
+        # Return a success response
+        return jsonify({'msg': 'Ticket created successfully'}), 201
+
+    except Exception as e:
+        return jsonify({"msg": "Failed to create ticket", "error": str(e)}), 500
+
 
 # Update ticket
 @app.route('/api/tickets/<int:ticket_id>', methods=['PUT'])
