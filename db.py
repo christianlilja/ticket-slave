@@ -66,7 +66,8 @@ def init_db():
                 is_admin INTEGER DEFAULT 0,
                 notify_email INTEGER DEFAULT 0,
                 notify_pushover INTEGER DEFAULT 0,
-                notify_apprise INTEGER DEFAULT 0
+                notify_apprise INTEGER DEFAULT 0,
+                theme TEXT DEFAULT 'dark'
             )
         """)
 

@@ -3,7 +3,7 @@ from email.mime.text import MIMEText
 import requests
 import os
 import logging
-from apprise import apprise
+from apprise import Apprise
 # Optional: Setup a simple logger
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,11 @@ def send_apprise_notification(apprise_url, title, body):
     try:
         apobj = Apprise()
         apobj.add(apprise_url)
-        success = apobj.notify(title=title, body=body)
+        success = apobj.notify(
+            title=title,
+            body=body
+        )
+        
         if not success:
             print("Apprise notification failed to send.")
     except Exception as e:

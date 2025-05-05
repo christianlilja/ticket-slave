@@ -1,2 +1,4 @@
 venv/
 database.db
+database2.db
+__pycache__/

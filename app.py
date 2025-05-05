@@ -6,7 +6,6 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from functools import wraps
 from jinja2 import TemplateNotFound, TemplateSyntaxError
-#from contextlib import contextmanager
 import sqlite3
 import os
 from notifications import send_pushover_notification, send_email_notification, send_apprise_notification
@@ -60,7 +59,7 @@ def notify_assigned_user(ticket_id, event_type, user_id):
 
         assigned_user = conn.execute("""
             SELECT id, username, email, pushover_user_key, pushover_api_token, 
-                   notify_email, notify_pushover
+                   apprise_url, notify_email, notify_pushover, notify_apprise
             FROM users WHERE id = ?
         """, (ticket['assigned_to'],)).fetchone()
 
@@ -99,6 +98,15 @@ def notify_assigned_user(ticket_id, event_type, user_id):
                 subject=subject,
                 body=message
             )
+
+        # Send Apprise if enabled
+        if assigned_user['notify_apprise'] == 1 and assigned_user['apprise_url']:
+            send_apprise_notification(
+                apprise_url=assigned_user['apprise_url'],
+                title=subject,
+                body=message
+            )
+
 
 @app.context_processor
 def inject_version():
@@ -395,15 +403,22 @@ def edit_user(user_id):
             email = request.form['email']
             pushover_user_key = request.form['pushover_user_key']
             pushover_api_token = request.form['pushover_api_token']
+            apprise_url = request.form.get('apprise_url', '')
+            notify_email = 1 if 'notify_email' in request.form else 0
+            notify_pushover = 1 if 'notify_pushover' in request.form else 0
+            notify_apprise = 1 if 'notify_apprise' in request.form else 0
             new_password = request.form.get('new_password')
 
-            # Always update email and pushover fields
+            # Always update email, notification flags, and Apprise settings
             conn.execute(
-                'UPDATE users SET email = ?, pushover_user_key = ?, pushover_api_token = ? WHERE id = ?', 
-                (email, pushover_user_key, pushover_api_token, user_id)
+                '''UPDATE users 
+                   SET email = ?, pushover_user_key = ?, pushover_api_token = ?, 
+                       notify_email = ?, notify_pushover = ?, apprise_url = ?, notify_apprise = ?
+                   WHERE id = ?''',
+                (email, pushover_user_key, pushover_api_token,
+                 notify_email, notify_pushover, apprise_url, notify_apprise, user_id)
             )
 
-            # Only update password if a new password was entered
             if new_password:
                 hashed_password = generate_password_hash(new_password)
                 conn.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_password, user_id))
@@ -413,6 +428,7 @@ def edit_user(user_id):
             return redirect(url_for('manage_users'))
 
     return render_template('edit_user.html', user=user)
+
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -429,12 +445,14 @@ def profile():
             email = request.form['email']
             pushover_user_key = request.form['pushover_user_key']
             pushover_api_token = request.form['pushover_api_token']
+            apprise_url = request.form['apprise_url']
+
             notify_email = 1 if 'notify_email' in request.form else 0
             notify_pushover = 1 if 'notify_pushover' in request.form else 0
-            new_password = request.form.get('new_password')
-            apprise_url = request.form['apprise_url']
             notify_apprise = 1 if 'notify_apprise' in request.form else 0
-            
+
+            new_password = request.form.get('new_password')
+
             conn.execute(
                 '''UPDATE users
                    SET email = ?, pushover_user_key = ?, pushover_api_token = ?,
@@ -464,6 +482,13 @@ def profile():
                         args=(email, "Test", "This is a test email notification"),
                         daemon=True
                     ).start()
+                if notify_apprise and apprise_url:
+                    threading.Thread(
+                        target=send_apprise_notification,
+                        args=(apprise_url, "Test", "This is a test Apprise notification"),
+                        daemon=True
+                    ).start()
+
                 flash('Test notification sent.', 'info')
             else:
                 flash('Profile updated successfully.', 'success')
@@ -471,6 +496,7 @@ def profile():
             return redirect(url_for('profile'))
 
     return render_template('profile.html', user=user)
+
 
 @app.route('/toggle_theme', methods=['POST'])
 @login_required

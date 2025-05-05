@@ -14,6 +14,9 @@
     <label class="form-check-label" for="notify_email">
       Receive email notifications
     </label>
+
+  <div class="mb-3"></div>
+
   </div>
     <div class="mb-3">
     <label>Pushover User Key</label>
@@ -24,11 +27,6 @@
     <input type="text" name="pushover_api_token" class="form-control" value="{{ user['pushover_api_token'] or '' }}">
   </div>
 
-  <div class="mb-3">
-    <label for="apprise_url" class="form-label">Apprise URL</label>
-    <input type="text" class="form-control" id="apprise_url" name="apprise_url" value="{{ user['apprise_url'] or '' }}">
-</div>
-
   <div class="form-check">
     <input class="form-check-input" type="checkbox" name="notify_pushover" id="notify_pushover"
            {% if user['notify_pushover'] %}checked{% endif %}>
@@ -37,11 +35,18 @@
     </label>
   </div>
 
-  <div class="form-check">
-    <input class="form-check-input" type="checkbox" id="notify_apprise" name="notify_apprise" {% if user['notify_apprise'] %}checked{% endif %}>
-    <label class="form-check-label" for="notify_apprise">
-        Enable Apprise Notifications
-    </label>
+  <div class="mb-3"></div>
+
+  <div class="mb-3">
+    <label for="apprise_url" class="form-label">Apprise URL</label>
+    <input type="text" class="form-control" id="apprise_url" name="apprise_url" value="{{ user['apprise_url'] or '' }}">
+</div>
+
+<div class="form-check">
+  <input class="form-check-input" type="checkbox" id="notify_apprise" name="notify_apprise" {% if user['notify_apprise'] %}checked{% endif %}>
+  <label class="form-check-label" for="notify_apprise">
+      Enable Apprise Notifications
+  </label>
 </div>
 
   <hr>
