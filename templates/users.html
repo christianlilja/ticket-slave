@@ -29,7 +29,7 @@
       <td>{{ 'Yes' if user['is_admin'] else 'No' }}</td>
       <td>
         <div class="d-flex gap-2">
-          <a href="{{ url_for('edit_user', user_id=user['id']) }}" class="btn btn-sm btn-secondary p-1">Edit</a>
+          <a href="{{ url_for('users_bp.edit_user', user_id=user['id']) }}" class="btn btn-sm btn-secondary p-1">Edit</a>
       
           {% if not user['is_admin'] %}
             <form method="post" action="" onsubmit="return confirm('Delete user {{ user['username'] }}?')">

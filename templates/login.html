@@ -5,18 +5,20 @@
   <div class="w-100" style="max-width: 400px;">
     <form method="post">
       <div class="mb-3">
-        <label for="username">Username</label>
-        <input type="text" name="username" class="form-control" required>
+        <label for="username" class="form-label">Username</label>
+        <input type="text" id="username" name="username" class="form-control" required autocomplete="username">
       </div>
       <div class="mb-3">
-        <label for="password">Password</label>
-        <input type="password" name="password" class="form-control" required>
+        <label for="password" class="form-label">Password</label>
+        <input type="password" id="password" name="password" class="form-control" required autocomplete="current-password">
       </div>
-      <button type="submit" class="btn btn-primary">Login</button>
+      <button type="submit" class="btn btn-primary w-100">Login</button>
     </form>
     {% if allow_registration %}
-      <a href="{{ url_for('register') }}">Don't have an account? Register</a>
-  {% endif %}
+      <div class="text-center mt-3">
+        <a href="{{ url_for('auth.register') }}">Don't have an account? Register</a>
+      </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

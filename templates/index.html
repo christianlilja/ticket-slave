@@ -3,7 +3,7 @@
 {% block content %}
 <h2 class="mb-4">Tickets</h2>
 
-<form method="get" action="{{ url_for('index') }}" class="d-flex align-items-center gap-2 mb-3" id="filterForm">
+<form method="get" action="{{ url_for('main_bp.index') }}" class="d-flex align-items-center gap-2 mb-3" id="filterForm">
     <div style="min-width: 200px;">
         <select name="sort_by" class="form-select form-select-sm">
             <option value="priority" {% if sort_by == 'priority' %}selected{% endif %}>Sort by Priority</option>
@@ -66,7 +66,7 @@
     </thead>
     <tbody>
         {% for ticket in tickets %}
-        <tr onclick="window.location='{{ url_for('ticket_detail', ticket_id=ticket['id']) }}'">
+        <tr onclick="window.location='{{ url_for('tickets_bp.ticket_detail', ticket_id=ticket['id']) }}'">
             <td>{{ ticket['id'] }}</td>
             <td>{{ ticket['title'] }}</td>
             <td>{{ ticket['status'] }}</td>
@@ -104,19 +104,19 @@
     <ul class="pagination justify-content-center">
         {% if page > 1 %}
         <li class="page-item">
-            <a class="page-link" href="{{ url_for('index', page=page-1, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">Previous</a>
+            <a class="page-link" href="{{ url_for('main_bp.index', page=page-1, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">Previous</a>
         </li>
         {% endif %}
 
         {% for p in range(1, total_pages + 1) %}
         <li class="page-item {% if p == page %}active{% endif %}">
-            <a class="page-link" href="{{ url_for('index', page=p, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">{{ p }}</a>
+            <a class="page-link" href="{{ url_for('main_bp.index', page=p, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">{{ p }}</a>
         </li>
         {% endfor %}
 
         {% if page < total_pages %}
         <li class="page-item">
-            <a class="page-link" href="{{ url_for('index', page=page+1, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">Next</a>
+            <a class="page-link" href="{{ url_for('main_bp.index', page=page+1, sort_by=sort_by, show_closed=show_closed, assigned_only=assigned_only) }}">Next</a>
         </li>
         {% endif %}
     </ul>

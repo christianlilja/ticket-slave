@@ -2,3 +2,10 @@ venv/
 database.db
 database2.db
 __pycache__/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+.env
+test/

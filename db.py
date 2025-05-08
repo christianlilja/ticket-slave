@@ -1,6 +1,8 @@
 # db.py
 import sqlite3
 from contextlib import contextmanager
+from werkzeug.security import generate_password_hash
+from settings import DEFAULT_SETTINGS
 
 DB_PATH = 'database.db'
 
@@ -102,4 +104,53 @@ def init_db():
             )
         """)
 
+        conn.commit()
+
+def ensure_default_settings():
+    with get_db() as conn:
+        for key, info in DEFAULT_SETTINGS.items():
+            exists = conn.execute("SELECT 1 FROM settings WHERE key = ?", (key,)).fetchone()
+            if not exists:
+                conn.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (key, info['default']))
+        conn.commit()
+
+@contextmanager
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+def load_settings():
+    with get_db() as conn:
+        return {
+            row['key']: row['value']
+            for row in conn.execute('SELECT key, value FROM settings').fetchall()
+        }
+
+
+
+def ensure_admin_user():
+    #from app import get_db, load_settings  # Avoid circular import issues by importing here
+    settings = load_settings()
+    username = settings.get('admin_username', 'admin')
+    password = settings.get('admin_password', 'changeme')
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE is_admin = 1")
+        if cur.fetchone():
+            return  # Admin already exists
+
+        hashed_password = generate_password_hash(password)
+        cur.execute(
+            "INSERT INTO users (username, password, is_admin) VALUES (?, ?, 1)",
+            (username, hashed_password)
+        )
         conn.commit()

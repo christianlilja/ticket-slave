@@ -3,18 +3,20 @@
 <h2>Register</h2>
 <div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
   <div class="w-100" style="max-width: 400px;">
-<form method="post">
-  <div class="mb-3">
-    <label for="username">Username</label>
-    <input type="text" name="username" class="form-control" required>
+    <form method="post">
+      <div class="mb-3">
+        <label for="username" class="form-label">Username</label>
+        <input type="text" id="username" name="username" class="form-control" required autocomplete="username">
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input type="password" id="password" name="password" class="form-control" required autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Register</button>
+    </form>
+    <div class="text-center mt-3">
+      <a href="{{ url_for('auth.login') }}">Already have an account? Login</a>
+    </div>
   </div>
-  <div class="mb-3">
-    <label for="password">Password</label>
-    <input type="password" name="password" class="form-control" required>
-  </div>
-  <button type="submit" class="btn btn-primary">Register</button>
-</form>
-<a href="{{ url_for('login') }}">Already have an account? Login</a>
-</div>
 </div>
 {% endblock %}

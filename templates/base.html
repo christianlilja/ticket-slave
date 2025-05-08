@@ -17,7 +17,7 @@
             <a href="/create" class="btn btn-outline-light me-2">Create Ticket</a>
             {% if session.get('is_admin') %}
                 <a href="/queues" class="btn btn-outline-light me-2">Queues</a>
-                <a href="{{ url_for('manage_users') }}" class="btn btn-outline-light me-2">Users</a>
+                <a href="{{ url_for('users_bp.manage_users') }}" class="btn btn-outline-light me-2">Users</a>
                 <a href="/settings" class="btn btn-outline-light me-2">Settings</a>
             {% endif %}
         </div>
@@ -25,7 +25,7 @@
         <!-- Right side: theme toggle + profile -->
         <div class="d-flex align-items-center">
             <!-- Theme Toggle Button -->
-            <form action="{{ url_for('toggle_theme') }}" method="post" class="me-2 mb-0">
+            <form action="{{ url_for('profile_bp.toggle_theme') }}" method="post" class="me-2 mb-0">
                 <button type="submit" class="btn btn-outline-light" title="Toggle Theme">
                     {% if session.get('theme') == 'light' %}
                         🌙
@@ -41,7 +41,7 @@
                     {{ session['username'] }}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                    <li><a class="dropdown-item" href="{{ url_for('profile') }}">Profile</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('profile_bp.profile') }}">Profile</a></li>
                     <li><a class="dropdown-item" href="/logout">Logout</a></li>
                 </ul>
             </div>
