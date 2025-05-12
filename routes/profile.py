@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
 from werkzeug.security import generate_password_hash
-from db import get_db
+from app.db import get_db
 from utils.decorators import login_required
-from notifications import send_email_notification, send_pushover_notification, send_apprise_notification
+from app.notifications_core import send_email_notification, send_pushover_notification, send_apprise_notification
 import threading
 
 profile_bp = Blueprint('profile_bp', __name__)

@@ -5,13 +5,13 @@ from flask import (
 from datetime import datetime
 from werkzeug.utils import secure_filename
 from utils.decorators import login_required
-from db import get_db
-from notifications import notify_assigned_user
+from app.db import get_db
+from app.notifications_core import notify_assigned_user
 from utils.files import allowed_file
 import os
 import threading
 
-tickets_bp = Blueprint('tickets_bp', __name__, template_folder='templates')
+tickets_bp = Blueprint('tickets_bp', __name__)
 
 @tickets_bp.route('/ticket/<int:ticket_id>')
 @login_required

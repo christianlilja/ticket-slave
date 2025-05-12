@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request
 from utils.decorators import login_required
-from db import get_db  # Adjust this import based on your project structure
+from app.db import get_db  # Adjust this import based on your project structure
 
 queues_bp = Blueprint('queues_bp', __name__)  # Use 'queue' consistently
 

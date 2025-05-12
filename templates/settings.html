@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<div id="flash-container"></div>
 <h2>Settings</h2>
 
 <!-- Tab navigation -->
@@ -31,6 +32,11 @@
     <div class="tab-pane fade" id="email" role="tabpanel">
       <div class="mb-3 mt-3">
         <label for="smtp_server" class="form-label">SMTP Server</label>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="smtp_use_tls" id="smtp_use_tls" {% if settings['smtp_use_tls'] == '1' %}checked{% endif %}>
+          <label class="form-check-label" for="smtp_use_tls">Use TLS</label>
+          </div>
+          <div style="margin-top: 20px;">
         <input type="text" class="form-control" name="smtp_server" value="{{ settings['smtp_server'] }}">
       </div>
       <div class="mb-3">
@@ -49,13 +55,40 @@
         <label for="smtp_password" class="form-label">SMTP Password</label>
         <input type="password" class="form-control" name="smtp_password" value="{{ settings['smtp_password'] }}">
       </div>
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="smtp_use_tls" id="smtp_use_tls" {% if settings['smtp_use_tls'] == '1' %}checked{% endif %}>
-        <label class="form-check-label" for="smtp_use_tls">Use TLS</label>
+        <div style="left-bottom: 30px;"></div>
+        <button type="button" id="test-email-btn" class="btn btn-outline-info mt-2">
+          Test Email Settings
+        </button>
       </div>
-    </div>
   </div>
-
-  <button type="submit" class="btn btn-primary mt-4">Save Settings</button>
+  <div style="margin-bottom: 50px;"></div>
+  <div class="d-flex gap-2">
+    <button type="submit" name="action" value="save_settings" class="btn btn-primary">
+      Save Settings
+    </button>
+  </div>
 </form>
+<script>
+  document.getElementById('test-email-btn').addEventListener('click', function () {
+    fetch('/settings/test-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token() if csrf_token else '' }}'
+      },
+      body: JSON.stringify({})
+    })
+    .then(res => res.json())
+    .then(data => {
+      const flashContainer = document.getElementById('flash-container');
+      if (flashContainer) {
+        const div = document.createElement('div');
+        div.className = `alert alert-${data.category || 'info'} mt-3`;
+        div.textContent = data.message;
+        flashContainer.appendChild(div);
+      }
+    })
+    .catch(err => console.error('Error testing email:', err));
+  });
+  </script>
 {% endblock %}

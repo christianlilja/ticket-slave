@@ -1,8 +1,14 @@
-venv/
+# Bytecode and virtual environments
 __pycache__/
-*.db
-*.log
-*.pyc
+*.py[cod]
 *.pyo
-*.pyd
+venv/
+
+# Logs and databases
+*.log
+*.db
+instance/*.db
+instance/database*
+
+# Secrets
 .env

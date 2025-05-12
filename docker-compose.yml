@@ -1,29 +1,12 @@
 services:
   ticketslave:
-    build: .
-    container_name: ticketslave
+    image: chris482/ticketslave:latest
     ports:
       - "5000:5000"
     env_file:
       - .env
     volumes:
-      - .:/app
-    profiles:
-      - prod
-
-  ticketslave-dev:
-    build: .
-    container_name: ticketslave-dev
-    ports:
-      - "5000:5000"
-    env_file:
-      - .env
-    volumes:
-      - .:/app
-    command: flask run --host=0.0.0.0 --reload
-    environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-      - FLASK_APP=app.py
-    profiles:
-      - dev
+      - ./data:/data
+   environment:
+      - DATA_DIR=/data
+    restart: unless-stopped

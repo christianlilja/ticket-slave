@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, abort
 from utils.decorators import login_required
 from datetime import datetime
-from db import get_db  # Ensure you have this helper for DB connection
+from app.db import get_db  # Ensure you have this helper for DB connection
 
 main_bp = Blueprint('main_bp', __name__)
 

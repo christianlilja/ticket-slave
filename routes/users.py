@@ -1,7 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, session, render_template, flash, abort
 from werkzeug.security import generate_password_hash
 from utils.decorators import login_required, admin_required
-from db import get_db
+from app.db import get_db
 import sqlite3
 
 users_bp = Blueprint("users_bp", __name__)
