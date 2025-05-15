@@ -8,8 +8,8 @@ from utils.decorators import login_required
 from app.db import get_db
 from app.notifications_core import notify_assigned_user
 from utils.files import allowed_file
+from utils.context_runner import run_in_app_context
 import os
-import threading
 
 tickets_bp = Blueprint('tickets_bp', __name__)
 
@@ -60,7 +60,7 @@ def update_assigned_to(ticket_id):
     with get_db() as conn:
         conn.execute('UPDATE tickets SET assigned_to = ? WHERE id = ?', (assigned_to, ticket_id))
     if assigned_to:
-        threading.Thread(target=notify_assigned_user, args=(ticket_id, 'assigned', session['user_id']), daemon=True).start()
+        run_in_app_context(current_app._get_current_object(), notify_assigned_user, ticket_id, 'assigned', session['user_id'])
     flash('Assigned user updated successfully!', 'success')
     return redirect(url_for('tickets_bp.ticket_detail', ticket_id=ticket_id))
 
@@ -111,11 +111,7 @@ def create_ticket():
                 conn.commit()
 
                 if assigned_to:
-                    threading.Thread(
-                        target=notify_assigned_user,
-                        args=(ticket_id, 'assigned', session.get('user_id')),
-                        daemon=True
-                    ).start()
+                     run_in_app_context(current_app._get_current_object(), notify_assigned_user, ticket_id, 'assigned', session['user_id'])
 
                 flash('Ticket created successfully!', 'success')
                 return redirect(url_for('main_bp.index'))
@@ -137,7 +133,7 @@ def add_comment(ticket_id):
         return redirect(url_for('tickets_bp.ticket_detail', ticket_id=ticket_id))
     with get_db() as conn:
         conn.execute('INSERT INTO comments (ticket_id, content, user_id, created_at) VALUES (?, ?, ?, ?)', (ticket_id, content, user_id, created_at))
-    threading.Thread(target=notify_assigned_user,args=(ticket_id, 'new_comment', user_id), daemon=True).start()
+        run_in_app_context(current_app._get_current_object(), notify_assigned_user, ticket_id, 'new_comment', session['user_id'])
     flash('Comment added successfully!', 'success')
     return redirect(url_for('tickets_bp.ticket_detail', ticket_id=ticket_id))
 
@@ -148,7 +144,7 @@ def update_status(ticket_id):
     user_id = session.get('user_id')
     with get_db() as conn:
         conn.execute('UPDATE tickets SET status = ? WHERE id = ?', (new_status, ticket_id))
-    threading.Thread(target=notify_assigned_user, args=(ticket_id, 'status', user_id), daemon=True).start()
+    run_in_app_context(current_app._get_current_object(), notify_assigned_user, ticket_id, 'status', session['user_id'])
     flash('Status updated successfully!', 'success')
     return redirect(url_for('tickets_bp.ticket_detail', ticket_id=ticket_id))
 
@@ -159,7 +155,7 @@ def update_priority(ticket_id):
     user_id = session.get('user_id')
     with get_db() as conn:
         conn.execute('UPDATE tickets SET priority = ? WHERE id = ?', (new_priority, ticket_id))
-    threading.Thread(target=notify_assigned_user, args=(ticket_id, 'priority', user_id), daemon=True).start()
+    run_in_app_context(current_app._get_current_object(), notify_assigned_user, ticket_id, 'priority', session['user_id'])
     flash('Priority updated successfully!', 'success')
     return redirect(url_for('tickets_bp.ticket_detail', ticket_id=ticket_id))
 

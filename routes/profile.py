@@ -1,9 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, current_app
 from werkzeug.security import generate_password_hash
 from app.db import get_db
 from utils.decorators import login_required
 from app.notifications_core import send_email_notification, send_pushover_notification, send_apprise_notification
 import threading
+from utils.context_runner import run_in_app_context
+
 
 profile_bp = Blueprint('profile_bp', __name__)
 
@@ -63,26 +65,35 @@ def profile():
 def send_test_notifications(email, pushover_user_key, pushover_api_token, apprise_url,
                             notify_email, notify_pushover, notify_apprise):
     """Send test notifications in background threads."""
+    app = current_app._get_current_object()
+
     if notify_pushover and pushover_user_key and pushover_api_token:
-        threading.Thread(
-            target=send_pushover_notification,
-            args=(pushover_user_key, pushover_api_token, "Test", "This is a test Pushover notification"),
-            daemon=True
-        ).start()
+        run_in_app_context(
+            app,
+            send_pushover_notification,
+            pushover_user_key,
+            pushover_api_token,
+            "Test",
+            "This is a test Pushover notification"
+        )
 
     if notify_email and email:
-        threading.Thread(
-            target=send_email_notification,
-            args=(email, "Test", "This is a test email notification"),
-            daemon=True
-        ).start()
+        run_in_app_context(
+            app,
+            send_email_notification,
+            "Test",
+            "This is a test email notification",
+            email
+        )
 
     if notify_apprise and apprise_url:
-        threading.Thread(
-            target=send_apprise_notification,
-            args=(apprise_url, "Test", "This is a test Apprise notification"),
-            daemon=True
-        ).start()
+        run_in_app_context(
+            app,
+            send_apprise_notification,
+            apprise_url,
+            "Test",
+            "This is a test Apprise notification"
+        )
 
 
 @profile_bp.route('/toggle_theme', methods=['POST'])
