@@ -9,3 +9,5 @@ __pycache__/
 *.db
 .env
 test/
+upload/
+instance/logs/
