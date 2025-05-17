@@ -1,13 +1,31 @@
-from flask import Blueprint, render_template, request, session, abort
+from flask import Blueprint, render_template, request, session, abort, redirect, send_from_directory, current_app
 from utils.decorators import login_required
 from datetime import datetime
 from app.db import get_db  # Ensure you have this helper for DB connection
+import os
 
 main_bp = Blueprint('main_bp', __name__)
 
+@main_bp.route('/favicon.ico')
+def favicon():
+    return send_from_directory(
+        os.path.join(current_app.root_path, 'static'),
+        'favicon-32x32.png',
+        mimetype='image/png'
+    )
+
 @main_bp.route("/")
-@login_required
 def index():
+    current_app.logger.info(
+        "Index page accessed",
+        extra={
+            'user_id': session.get('user_id'),
+            'query_params': dict(request.args)
+        }
+    )
+    if not session.get('user_id'):
+        return redirect("/login")
+    
     assigned_only = request.args.get('assigned_only', 'false').lower() == 'true'
     show_closed = request.args.get('show_closed', 'false').lower() == 'true'
     sort_by = request.args.get('sort_by', 'created_at')

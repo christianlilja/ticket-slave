@@ -3,6 +3,7 @@
 {% block content %}
 <h2>Manage Queues</h2>
 <form method="post" class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="mb-3 d-flex gap-3 align-items-center">
         <input type="text" name="name" class="form-control" placeholder="New Queue Name" required>
         <button type="submit" class="btn btn-success">Add Queue</button>

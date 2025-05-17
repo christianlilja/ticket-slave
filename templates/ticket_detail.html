@@ -8,6 +8,7 @@
 <!-- Priority Update Form -->
 <p class="mb-1"><strong>Priority:</strong></p>
 <form method="post" action="/ticket/{{ ticket['id'] }}/priority" class="mb-4" style="max-width: 250px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="input-group">
         <select name="priority" class="form-select">
             <option value="low" {% if ticket['priority'] == 'low' %}selected{% endif %}>Low</option>
@@ -21,6 +22,7 @@
 <!-- Assigned To Update Form -->
 <p class="mb-1"><strong>Assigned To:</strong></p>
 <form method="post" action="/ticket/{{ ticket['id'] }}/assign" class="mb-4" style="max-width: 300px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="input-group">
         <select name="assigned_to" id="assigned_to" class="form-select">
             <option value="">Unassigned</option>
@@ -37,6 +39,7 @@
 <!-- Status Update Form -->
 <p class="mb-1"><strong>Status:</strong></p>
 <form method="post" action="/ticket/{{ ticket['id'] }}/status" class="mb-4" style="max-width: 250px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="input-group">
         <select name="status" class="form-select">
             <option value="open" {% if ticket['status'] == 'open' %}selected{% endif %}>Open</option>
@@ -79,6 +82,7 @@
 
 <!-- New Comment Form -->
 <form method="post" action="/ticket/{{ ticket['id'] }}/comment">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="mb-3">
         <label for="content" class="form-label">New comment</label>
         <textarea name="content" class="form-control" rows="3" required></textarea>

@@ -5,6 +5,7 @@
 <h2>Edit User: {{ user['username'] }}</h2>
 
 <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="mb-3">
         <label for="email" class="form-label">Email Address</label>
         <input type="email" name="email" id="email" class="form-control" value="{{ user['email'] or '' }}">

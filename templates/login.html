@@ -4,6 +4,7 @@
 <div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
   <div class="w-100" style="max-width: 400px;">
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       <div class="mb-3">
         <label for="username" class="form-label">Username</label>
         <input type="text" id="username" name="username" class="form-control" required autocomplete="username">
@@ -16,7 +17,7 @@
     </form>
     {% if allow_registration %}
       <div class="text-center mt-3">
-        <a href="{{ url_for('auth.register') }}">Don't have an account? Register</a>
+        <a href="{{ url_for('auth_bp.register') }}">Don't have an account? Register</a>
       </div>
     {% endif %}
   </div>
