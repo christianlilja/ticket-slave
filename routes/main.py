@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, abort, redirect, send_from_directory, current_app
 from utils.decorators import login_required
 from datetime import datetime
-from app.db import get_db  # Ensure you have this helper for DB connection
+from app.db import db_manager # Use the db_manager instance
 import os
 
 main_bp = Blueprint('main_bp', __name__)
@@ -78,17 +78,18 @@ def index():
 
     # Count total for pagination
     count_query = f'SELECT COUNT(*) {base_query} {where_clause}'
-
-    with get_db() as conn:
-        total = conn.execute(count_query, params).fetchone()[0]
+    
+    # Use db_manager to execute the count query
+    total_row = db_manager.fetchone(count_query, tuple(params)) # Ensure params is a tuple
+    total = total_row[0] if total_row else 0
 
     total_pages = (total + per_page - 1) // per_page
     offset = (page - 1) * per_page
 
     # Main ticket query
     query = f'''
-        SELECT 
-            tickets.*, 
+        SELECT
+            tickets.*,
             queues.name AS queue,
             users.username AS assigned_to_username
         {base_query}
@@ -96,11 +97,11 @@ def index():
         ORDER BY {order_by_clause}
         LIMIT ? OFFSET ?
     '''
-
+    
     tickets = []
-    with get_db() as conn:
-        rows = conn.execute(query, (*params, per_page, offset)).fetchall()
-        for row in rows:
+    # Use db_manager to fetch tickets
+    rows = db_manager.fetchall(query, (*params, per_page, offset))
+    for row in rows:
             # Parse deadline
             deadline = row['deadline']
             is_overdue = False

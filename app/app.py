@@ -1,8 +1,12 @@
 from flask import Flask
 import os
 from app.error import register_error_handlers
-from app.settings_loader import DEFAULT_SETTINGS
-from app.db import init_db, load_settings, ensure_default_settings, ensure_admin_user
+# DEFAULT_SETTINGS is used in app.db, not directly here anymore for these functions
+# from app.settings_loader import DEFAULT_SETTINGS
+from app.db import init_db, load_settings, ensure_default_settings, ensure_admin_user, ensure_default_queue
+# It's good practice to also initialize the db_manager if it's meant to be a global singleton used by app.db
+# However, app.db already instantiates it. If we need to pass `app` to it, that's a different pattern.
+# from app.database_manager import DatabaseManager # db_manager is already instantiated in app.db
 
 # Blueprints
 from routes.main import main_bp
@@ -53,12 +57,15 @@ def inject_version():
 
 # Start app
 if __name__ == '__main__':
-    init_db()
-    ensure_default_settings()
-    settings = load_settings()
-    ensure_admin_user()
-    if settings.get('enable_api') == '1':
-        import app.api as api  # Ensure api doesn't execute code on import unless necessary
+    # The app context is needed for db operations that rely on current_app
+    with app.app_context():
+        init_db()
+        ensure_default_settings()
+        settings = load_settings() # load_settings now uses db_manager
+        ensure_admin_user() # ensure_admin_user now uses db_manager
+        ensure_default_queue() # ensure_default_queue now uses db_manager
+        if settings.get('enable_api') == '1':
+            import app.api as api  # Ensure api doesn't execute code on import unless necessary
     app.run(host="0.0.0.0", port=5000, debug=True)
 
 # Error logging

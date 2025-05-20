@@ -1,16 +1,15 @@
 from flask import Blueprint, request, redirect, url_for, render_template, session, flash, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.db import get_db  # Replace with your actual DB import path
+from app.db import db_manager # Use the db_manager instance
+import sqlite3 # For IntegrityError, if not handled by db_manager
 
 auth_bp = Blueprint('auth_bp', __name__)
 
 
 def is_registration_allowed():
-    with get_db() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT value FROM settings WHERE key = 'allow_registration'")
-        setting = cur.fetchone()
-        return setting and setting['value'] == '1'
+    # Use db_manager to fetch the setting
+    setting = db_manager.fetchone("SELECT value FROM settings WHERE key = 'allow_registration'")
+    return setting and setting['value'] == '1'
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
@@ -36,20 +35,28 @@ def register():
 
         password = generate_password_hash(raw_password)
 
-        with get_db() as conn:
-            cur = conn.cursor()
-            cur.execute('SELECT * FROM users WHERE username = ?', (username,))
-            if cur.fetchone():
+        try:
+            # Check if user exists using db_manager
+            existing_user = db_manager.fetchone('SELECT * FROM users WHERE username = ?', (username,))
+            if existing_user:
                 flash('Username already exists', 'danger')
                 return redirect(url_for('auth_bp.register'))
 
-            cur.execute(
+            # Insert new user using db_manager
+            db_manager.insert(
                 'INSERT INTO users (username, password) VALUES (?, ?)',
                 (username, password)
             )
-            conn.commit()
             flash('Registered successfully. Please log in.', 'success')
             return redirect(url_for('auth_bp.login'))
+        except sqlite3.IntegrityError: # Should ideally be caught if db_manager re-raises it
+            flash('Username already exists (Integrity Error).', 'danger')
+            return redirect(url_for('auth_bp.register'))
+        except Exception as e:
+            current_app.logger.error(f"Error during registration: {e}", exc_info=True)
+            flash('An error occurred during registration. Please try again.', 'danger')
+            return redirect(url_for('auth_bp.register'))
+
 
     return render_template('register.html')
 
@@ -60,18 +67,17 @@ def login():
 
     if request.method == 'POST':
         username = request.form.get('username')
-        password = request.form.get('password')
+        password_form = request.form.get('password') # Renamed to avoid conflict
 
-        if not username or not password:
+        if not username or not password_form:
             flash('Username and password are required.', 'danger')
             return render_template('login.html', allow_registration=allow_registration)
 
-        with get_db() as conn:
-            cur = conn.cursor()
-            cur.execute('SELECT * FROM users WHERE username = ?', (username,))
-            user = cur.fetchone()
+        try:
+            # Fetch user using db_manager
+            user = db_manager.fetchone('SELECT * FROM users WHERE username = ?', (username,))
 
-            if user and check_password_hash(user['password'], password):
+            if user and check_password_hash(user['password'], password_form):
                 session['user_id'] = user['id']
                 session['username'] = user['username']
                 session['is_admin'] = int(user['is_admin']) == 1
@@ -92,6 +98,10 @@ def login():
                     extra={'username_attempt': username}
                 )
                 flash('Invalid credentials.', 'danger')
+        except Exception as e:
+            current_app.logger.error(f"Error during login: {e}", exc_info=True)
+            flash('An error occurred during login. Please try again.', 'danger')
+
 
     return render_template('login.html', allow_registration=allow_registration)
 

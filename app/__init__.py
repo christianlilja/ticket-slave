@@ -137,9 +137,15 @@ def create_app():
 
     # 🔧 Perform app-specific setup inside app context
     with app.app_context():
-        from app.db import init_db, load_settings, ensure_default_settings, ensure_admin_user
+        from app.db import init_db, load_settings, ensure_default_settings, ensure_admin_user, ensure_default_queue
         init_db()
         ensure_default_settings()
+        default_queue_id = ensure_default_queue() # Ensure default queue and get its ID
+        if default_queue_id is None:
+            app.logger.critical("Could not ensure default queue. Ticket creation without a queue might fail if DB requires it.")
+            # Decide if app should halt or continue with a warning. For now, continue.
+        app.config['DEFAULT_QUEUE_ID'] = default_queue_id # Store it in app config
+
         settings = load_settings()
         ensure_admin_user()
 
