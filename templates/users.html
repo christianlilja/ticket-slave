@@ -2,8 +2,9 @@
 {% block content %}
 <h2>Manage Users</h2>
 
-<form method="post" class="row g-2 mb-4 align-items-center">
+<form method="post" action="{{ url_for('users_bp.manage_users') }}" class="row g-2 mb-4 align-items-center">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <input type="hidden" name="form_action" value="add_user">
   <div class="col-md-4">
     <input type="text" name="new_username" class="form-control" placeholder="Username" required>
   </div>
@@ -30,12 +31,13 @@
       <td>{{ 'Yes' if user['is_admin'] else 'No' }}</td>
       <td>
         <div class="d-flex gap-2">
-          <a href="{{ url_for('users_bp.edit_user', user_id=user['id']) }}" class="btn btn-sm btn-secondary p-1">Edit</a>
+          <a href="{{ url_for('users_bp.edit_user', user_id_to_edit=user['id']) }}" class="btn btn-sm btn-secondary p-1">Edit</a>
       
           {% if not user['is_admin'] %}
-            <form method="post" action="" onsubmit="return confirm('Delete user {{ user['username'] }}?')">
+            <form method="post" action="{{ url_for('users_bp.manage_users') }}" onsubmit="return confirm('Are you sure you want to delete user {{ user['username'] }}?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-              <input type="hidden" name="delete_user" value="{{ user['username'] }}">
+              <input type="hidden" name="form_action" value="delete_user">
+              <input type="hidden" name="delete_user_username" value="{{ user['username'] }}">
               <button type="submit" class="btn btn-sm btn-danger p-1">Delete</button>
             </form>
           {% endif %}

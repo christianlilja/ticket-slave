@@ -1,53 +1,105 @@
 # app/database_manager.py
 import sqlite3
+import os # Ensure os is imported
 from flask import current_app
 import logging
 from contextlib import contextmanager
 
-# Assuming get_db_path is defined in app.db or can be moved/replicated here
-# For now, let's try to import it or define a similar utility
-try:
-    from .db import get_db_path
-except ImportError:
-    # Fallback or simplified version if direct import fails
-    # This might happen if this module is used in a context where app.db is not yet fully set up
-    # Or if we decide to make database_manager more independent.
-    def get_db_path():
-        if current_app:
-            return current_app.config['DATABASE']
-        # This fallback is problematic if no app context is available.
-        # Consider how this module will be initialized and used.
-        raise RuntimeError("Database path not configured and no app context.")
+def _get_db_path_for_manager():
+    if not hasattr(current_app, 'config'):
+        raise RuntimeError("DBManager: Application context or config not available for _get_db_path_for_manager.")
+    
+    db_path_config = current_app.config.get('DATABASE')
+    
+    if db_path_config:
+        # Using os.path.abspath to ensure the path is absolute for logging/consistency
+        abs_db_path = os.path.abspath(db_path_config)
+        current_app.logger.debug(f"DBManager: Original DATABASE config path: '{db_path_config}', Resolved absolute path: '{abs_db_path}'")
+    else:
+        current_app.logger.warning("DBManager: DATABASE key in config is None or empty.")
+
+    if not db_path_config:
+        raise RuntimeError("DBManager: DATABASE key not found, not configured, or empty in current_app.config.")
+    return db_path_config
+
 
 @contextmanager
 def get_database_connection():
     """
-    Provides a database connection using the application's configured database path.
-    This is a simplified version of the get_db context manager from db.py,
-    focused on connection management for the DatabaseManager.
+    Provides and manages a database connection.
     """
     logger = current_app.logger if current_app else logging.getLogger(__name__)
-    db_path = get_db_path()
+    
+    app_id = id(current_app) if current_app else "N/A"
+    config_id = id(current_app.config) if hasattr(current_app, 'config') else "N/A"
+    logger.debug(f"DBManager: get_database_connection called. current_app id: {app_id}, config id: {config_id}")
+
+    db_path = _get_db_path_for_manager()
+    logger.debug(f"DBManager: Resolved db_path for connection: '{db_path}'")
+    
     conn = None
     try:
+        logger.debug(f"DBManager: Attempting sqlite3.connect(db_path='{db_path}')")
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        logger.debug(f"DBManager: Connection established to {db_path}")
+        logger.debug(f"DBManager: Connection object created for '{db_path}'. Conn id: {id(conn)}")
+
+        try:
+            conn.execute("PRAGMA foreign_keys = ON")
+            logger.debug(f"DBManager: PRAGMA foreign_keys=ON executed for '{db_path}'")
+        except sqlite3.Error as pragma_e:
+            logger.error(f"DBManager: Error executing PRAGMA foreign_keys=ON for '{db_path}': {pragma_e}", exc_info=True)
+            if conn: conn.close()
+            raise RuntimeError(f"Failed to set PRAGMA foreign_keys on db connection to '{db_path}': {pragma_e}") from pragma_e
+        
+        try:
+            test_cursor = conn.cursor()
+            test_cursor.execute("SELECT 1")
+            test_cursor.fetchone()
+            logger.debug(f"DBManager: Post-PRAGMA test query on connection to '{db_path}' SUCCEEDED.")
+        except sqlite3.Error as test_e:
+            logger.error(f"DBManager: Post-PRAGMA test query on connection to '{db_path}' FAILED: {test_e}", exc_info=True)
+            if conn: conn.close()
+            raise RuntimeError(f"Connection to '{db_path}' became unusable after PRAGMA/connect: {test_e}") from test_e
+
+        try:
+            current_total_changes = conn.total_changes
+            logger.debug(f"DBManager: Connection appears live before yield for '{db_path}'. total_changes: {current_total_changes}. Yielding connection.")
+        except sqlite3.ProgrammingError as pe_before_yield:
+            logger.error(f"DBManager: CRITICAL - Connection to '{db_path}' IS CLOSED before yield! Error: {pe_before_yield}", exc_info=True)
+            if conn: conn.close()
+            raise RuntimeError(f"Connection to '{db_path}' was closed before it could be yielded.") from pe_before_yield
+        
         yield conn
+        
+        logger.debug(f"DBManager: Returned from yield for '{db_path}'. Attempting commit. Conn id: {id(conn)}")
         conn.commit()
-        logger.debug(f"DBManager: Transaction committed for {db_path}")
-    except Exception as e:
+        logger.debug(f"DBManager: Transaction committed for '{db_path}'")
+    except sqlite3.Error as e:
+        logger.error(f"DBManager: SQLite error for '{db_path}': {e}", exc_info=True)
         if conn:
-            logger.error(f"DBManager: Transaction rolled back for {db_path} due to: {e}", exc_info=True)
-            conn.rollback()
-        else:
-            logger.error(f"DBManager: Failed to connect to {db_path}: {e}", exc_info=True)
+            try:
+                conn.rollback()
+                logger.debug(f"DBManager: Transaction rolled back for '{db_path}' due to SQLite error.")
+            except sqlite3.Error as rb_e:
+                logger.error(f"DBManager: Error during rollback for '{db_path}': {rb_e}", exc_info=True)
+        raise
+    except Exception as e:
+        logger.error(f"DBManager: Non-SQLite error for '{db_path}': {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                logger.debug(f"DBManager: Transaction rolled back for '{db_path}' due to non-SQLite error.")
+            except sqlite3.Error as rb_e:
+                 logger.error(f"DBManager: Error during rollback (non-SQLite error path) for '{db_path}': {rb_e}", exc_info=True)
         raise
     finally:
         if conn:
+            logger.debug(f"DBManager: Closing connection in finally block for '{db_path}'. Conn id: {id(conn)}")
             conn.close()
-            logger.debug(f"DBManager: Connection closed for {db_path}")
+            logger.debug(f"DBManager: Connection closed for '{db_path}'")
+        else:
+            logger.debug(f"DBManager: No connection object to close in finally block for '{db_path}' (conn was None).")
 
 
 class DatabaseManager:
@@ -55,90 +107,150 @@ class DatabaseManager:
     A class to manage database operations, abstracting direct SQLite calls.
     """
     def __init__(self):
-        # The logger can be initialized here if preferred, or used from current_app
         self.logger = current_app.logger if current_app else logging.getLogger(__name__)
 
-    def execute_query(self, query, params=None, commit=False):
+    def execute_query(self, query, params=None):
         """
-        Executes a given SQL query.
-
-        :param query: The SQL query string.
-        :param params: A tuple of parameters to substitute into the query.
-        :param commit: Whether to commit the transaction immediately after this query.
-                       Note: get_database_connection handles commit on successful exit.
-                       This parameter might be redundant if all operations are single queries
-                       within their own connection context, or if batch operations are handled differently.
-        :return: The cursor object after execution.
+        Executes a given SQL query (DDL or DML). Returns rowcount for DML.
         """
         params = params or ()
-        self.logger.debug(f"Executing query: {query} with params: {params}")
+        self.logger.debug(f"DBManager: execute_query: {query} with params: {params}")
         with get_database_connection() as conn:
+            try:
+                self.logger.debug(f"DBManager: execute_query - conn.total_changes: {conn.total_changes}. Conn id: {id(conn)}")
+            except sqlite3.ProgrammingError as pe:
+                self.logger.error(f"DBManager: execute_query - conn is CLOSED! Error: {pe}. Conn id: {id(conn)}", exc_info=True)
+                raise
             cursor = conn.cursor()
             try:
                 cursor.execute(query, params)
-                # Commit is handled by the context manager on successful block exit.
-                # If an explicit commit is needed *before* the block ends, it's unusual
-                # for this setup. For DML returning lastrowid, it's fine.
-                self.logger.debug(f"Query executed successfully: {query}")
-                return cursor
+                self.logger.debug(f"DBManager: execute_query - executed. Rowcount: {cursor.rowcount}")
+                return cursor.rowcount
             except sqlite3.Error as e:
-                self.logger.error(f"Database error during query execution: {query} - {e}", exc_info=True)
-                raise # Re-raise the exception to be handled by the caller or context manager
+                self.logger.error(f"DBManager: execute_query - error: {query} - {e}", exc_info=True)
+                raise
+            finally:
+                if cursor: cursor.close()
 
     def fetchone(self, query, params=None):
         """
         Executes a query and fetches one row.
-
-        :param query: The SQL query string.
-        :param params: A tuple of parameters.
-        :return: A single row as a dictionary (or sqlite3.Row object), or None.
         """
-        cursor = self.execute_query(query, params)
-        return cursor.fetchone()
+        params = params or ()
+        self.logger.debug(f"DBManager: fetchone: {query} with params: {params}")
+        with get_database_connection() as conn:
+            try:
+                self.logger.debug(f"DBManager: fetchone - conn.total_changes: {conn.total_changes}. Conn id: {id(conn)}")
+            except sqlite3.ProgrammingError as pe:
+                self.logger.error(f"DBManager: fetchone - conn is CLOSED! Error: {pe}. Conn id: {id(conn)}", exc_info=True)
+                raise
+            cursor = conn.cursor()
+            try:
+                cursor.execute(query, params)
+                row = cursor.fetchone()
+                self.logger.debug(f"DBManager: fetchone - result: {'Row' if row else 'No row'}")
+                return row
+            except sqlite3.Error as e:
+                self.logger.error(f"DBManager: fetchone - error: {query} - {e}", exc_info=True)
+                raise
+            finally:
+                if cursor: cursor.close()
 
     def fetchall(self, query, params=None):
         """
         Executes a query and fetches all rows.
-
-        :param query: The SQL query string.
-        :param params: A tuple of parameters.
-        :return: A list of rows (dictionaries or sqlite3.Row objects).
         """
-        cursor = self.execute_query(query, params)
-        return cursor.fetchall()
+        params = params or ()
+        self.logger.debug(f"DBManager: fetchall: {query} with params: {params}")
+        with get_database_connection() as conn:
+            try:
+                self.logger.debug(f"DBManager: fetchall - conn.total_changes: {conn.total_changes}. Conn id: {id(conn)}")
+            except sqlite3.ProgrammingError as pe:
+                self.logger.error(f"DBManager: fetchall - conn is CLOSED! Error: {pe}. Conn id: {id(conn)}", exc_info=True)
+                raise
+            cursor = conn.cursor()
+            try:
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                self.logger.debug(f"DBManager: fetchall - result: {len(rows)} rows")
+                return rows
+            except sqlite3.Error as e:
+                self.logger.error(f"DBManager: fetchall - error: {query} - {e}", exc_info=True)
+                raise
+            finally:
+                if cursor: cursor.close()
 
     def insert(self, query, params=None):
         """
         Executes an INSERT query and returns the last inserted row ID.
-
-        :param query: The SQL INSERT query string.
-        :param params: A tuple of parameters.
-        :return: The ID of the last inserted row.
         """
-        cursor = self.execute_query(query, params)
-        return cursor.lastrowid
+        params = params or ()
+        self.logger.debug(f"DBManager: insert: {query} with params: {params}")
+        with get_database_connection() as conn:
+            try:
+                self.logger.debug(f"DBManager: insert - conn.total_changes: {conn.total_changes}. Conn id: {id(conn)}")
+            except sqlite3.ProgrammingError as pe:
+                self.logger.error(f"DBManager: insert - conn is CLOSED! Error: {pe}. Conn id: {id(conn)}", exc_info=True)
+                raise
+            cursor = conn.cursor()
+            try:
+                cursor.execute(query, params)
+                last_id = cursor.lastrowid
+                self.logger.debug(f"DBManager: insert - lastrowid: {last_id}")
+                return last_id
+            except sqlite3.Error as e:
+                self.logger.error(f"DBManager: insert - error: {query} - {e}", exc_info=True)
+                raise
+            finally:
+                if cursor: cursor.close()
 
     def update(self, query, params=None):
         """
         Executes an UPDATE query and returns the number of rows affected.
-
-        :param query: The SQL UPDATE query string.
-        :param params: A tuple of parameters.
-        :return: The number of rows affected.
         """
-        cursor = self.execute_query(query, params)
-        return cursor.rowcount
+        params = params or ()
+        self.logger.debug(f"DBManager: update: {query} with params: {params}")
+        with get_database_connection() as conn:
+            try:
+                self.logger.debug(f"DBManager: update - conn.total_changes: {conn.total_changes}. Conn id: {id(conn)}")
+            except sqlite3.ProgrammingError as pe:
+                self.logger.error(f"DBManager: update - conn is CLOSED! Error: {pe}. Conn id: {id(conn)}", exc_info=True)
+                raise
+            cursor = conn.cursor()
+            try:
+                cursor.execute(query, params)
+                rc = cursor.rowcount
+                self.logger.debug(f"DBManager: update - rowcount: {rc}")
+                return rc
+            except sqlite3.Error as e:
+                self.logger.error(f"DBManager: update - error: {query} - {e}", exc_info=True)
+                raise
+            finally:
+                if cursor: cursor.close()
 
     def delete(self, query, params=None):
         """
         Executes a DELETE query and returns the number of rows affected.
-
-        :param query: The SQL DELETE query string.
-        :param params: A tuple of parameters.
-        :return: The number of rows affected.
         """
-        cursor = self.execute_query(query, params)
-        return cursor.rowcount
+        params = params or ()
+        self.logger.debug(f"DBManager: delete: {query} with params: {params}")
+        with get_database_connection() as conn:
+            try:
+                self.logger.debug(f"DBManager: delete - conn.total_changes: {conn.total_changes}. Conn id: {id(conn)}")
+            except sqlite3.ProgrammingError as pe:
+                self.logger.error(f"DBManager: delete - conn is CLOSED! Error: {pe}. Conn id: {id(conn)}", exc_info=True)
+                raise
+            cursor = conn.cursor()
+            try:
+                cursor.execute(query, params)
+                rc = cursor.rowcount
+                self.logger.debug(f"DBManager: delete - rowcount: {rc}")
+                return rc
+            except sqlite3.Error as e:
+                self.logger.error(f"DBManager: delete - error: {query} - {e}", exc_info=True)
+                raise
+            finally:
+                if cursor: cursor.close()
 
 # Example of how it might be initialized and used in the app (e.g., in app/__init__.py or app/app.py)
 # db_manager = None

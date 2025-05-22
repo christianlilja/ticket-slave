@@ -1,4 +1,4 @@
-from flask import Blueprint, request, session, redirect, url_for, flash, render_template, abort
+from flask import Blueprint, request, session, redirect, url_for, flash, render_template, abort, current_app
 from utils.decorators import login_required
 import threading
 from app.db import db_manager # Use the db_manager instance

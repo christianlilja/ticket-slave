@@ -5,6 +5,7 @@ from app.db import db_manager # Use the db_manager instance
 import sqlite3 # For IntegrityError, if not handled by db_manager
 import re # For email validation in edit_user
 
+# Route definitions for user management
 users_bp = Blueprint("users_bp", __name__)
 
 @users_bp.route("/users", methods=["GET", "POST"])

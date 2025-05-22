@@ -1,21 +1,20 @@
 import smtplib
 from email.mime.text import MIMEText
 import requests
-# import logging # No longer needed directly if using current_app.logger
 from apprise import Apprise
-from app.db import get_db
-from utils.context_runner import run_in_app_context  # Import your helper
+from app.db import db_manager # Import db_manager instance
+from utils.context_runner import run_in_app_context
 from flask import current_app
 
-# logger = logging.getLogger(__name__) # Replaced by current_app.logger
-
 def send_email_notification(subject, body, to_email):
-    logger = current_app.logger # Use Flask's app logger
-    with get_db() as conn:
-        settings = {
-            row['key']: row['value']
-            for row in conn.execute("SELECT key, value FROM settings").fetchall()
-        }
+    logger = current_app.logger
+    try:
+        # Fetch settings using db_manager
+        settings_rows = db_manager.fetchall("SELECT key, value FROM settings")
+        settings = {row['key']: row['value'] for row in settings_rows}
+    except Exception as e:
+        logger.error(f"Failed to load settings for email notification: {e}", exc_info=True)
+        return # Cannot proceed without settings
 
     smtp_server = settings.get('smtp_server')
     smtp_port = int(settings.get('smtp_port', 587))
@@ -109,29 +108,27 @@ def notify_assigned_user(ticket_id, event_type, user_id):
     log_extra_base = {
         'ticket_id': ticket_id,
         'event_type': event_type,
-        'triggering_user_id': user_id # User who performed the action
+        'triggering_user_id': user_id
     }
 
-    with get_db() as conn:
-        ticket = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+    try:
+        ticket = db_manager.fetchone("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
         if not ticket:
             logger.warning("notify_assigned_user: Ticket not found", extra=log_extra_base)
             return
         if not ticket['assigned_to']:
-            logger.info("notify_assigned_user: Ticket not assigned, no notification needed", extra=log_extra_base)
+            logger.info("notify_assigned_user: Ticket not assigned", extra=log_extra_base)
             return
 
-        assigned_user = conn.execute("""
+        assigned_user = db_manager.fetchone("""
             SELECT id, username, email, pushover_user_key, pushover_api_token,
                    apprise_url, notify_email, notify_pushover, notify_apprise
             FROM users WHERE id = ?
-        """, (ticket['assigned_to'],)).fetchone()
+        """, (ticket['assigned_to'],))
 
         if not assigned_user:
-            logger.warning(
-                "notify_assigned_user: Assigned user not found in DB",
-                extra={**log_extra_base, 'assigned_user_id_from_ticket': ticket['assigned_to']}
-            )
+            logger.warning("notify_assigned_user: Assigned user not found",
+                           extra={**log_extra_base, 'assigned_user_id_from_ticket': ticket['assigned_to']})
             return
         
         log_extra_base['notified_user_id'] = assigned_user['id']
@@ -199,15 +196,22 @@ def notify_assigned_user(ticket_id, event_type, user_id):
                 subject,
                 message
             )
+    except Exception as e:
+        logger.error(f"Error in notify_assigned_user before sending notifications: {e}", extra=log_extra_base, exc_info=True)
+        # Depending on the error, you might want to return or re-raise
+        # For now, just logging and preventing a crash.
 
 
 def test_smtp_connection():
-    logger = current_app.logger # Use Flask's app logger
-    with get_db() as conn:
-        settings = {
-            row["key"]: row["value"]
-            for row in conn.execute("SELECT key, value FROM settings").fetchall()
-        }
+    logger = current_app.logger
+    try:
+        # Fetch settings using db_manager
+        settings_rows = db_manager.fetchall("SELECT key, value FROM settings")
+        settings = {row['key']: row['value'] for row in settings_rows}
+    except Exception as e:
+        logger.error(f"Failed to load settings for SMTP test: {e}", exc_info=True)
+        raise ValueError("Could not load SMTP settings from database.")
+
 
     smtp_server = settings.get("smtp_server")
     smtp_port = int(settings.get("smtp_port", 587))

@@ -154,16 +154,22 @@ def ensure_default_settings():
             exists = db_manager.fetchone("SELECT 1 FROM settings WHERE key = ?", (key,))
             if not exists:
                 default_value = info.get('default', '')
-                db_manager.insert("INSERT INTO settings (key, value) VALUES (?, ?)", (key, default_value))
-                logger.info(f"Inserted default setting: {key} = '{default_value}'")
-                settings_added_count += 1
+                try:
+                    db_manager.insert("INSERT INTO settings (key, value) VALUES (?, ?)", (key, default_value))
+                    logger.info(f"Inserted default setting: {key} = '{default_value}'")
+                    settings_added_count += 1
+                except sqlite3.IntegrityError:
+                    logger.warning(f"Default setting for key '{key}' already exists (caught by IntegrityError). Skipping.")
+                except Exception as e_insert:
+                    logger.error(f"Error inserting default setting for key '{key}': {e_insert}", exc_info=True)
+                    # Decide if this is critical enough to re-raise or if we can continue
         
         if settings_added_count > 0:
             logger.info(f"Finished ensuring default settings. Added {settings_added_count} new settings.")
         else:
-            logger.info("Finished ensuring default settings. All defaults were already present.")
-    except Exception as e:
-        logger.error(f"Error ensuring default settings: {e}", exc_info=True)
+            logger.info("Finished ensuring default settings. All defaults were already present or skipped due to existing.")
+    except Exception as e: # Catch errors from db_manager.fetchone or other unexpected issues
+        logger.error(f"Error ensuring default settings (outer try-except): {e}", exc_info=True)
 
 
 def ensure_admin_user():
@@ -213,11 +219,29 @@ def ensure_default_queue():
             logger.info(f"Default queue '{default_queue_name}' (ID: {existing_queue['id']}) already exists.")
             return existing_queue['id']
         else:
-            logger.info(f"Default queue '{default_queue_name}' not found. Creating...")
-            new_queue_id = db_manager.insert("INSERT INTO queues (name) VALUES (?)", (default_queue_name,))
-            logger.info(f"Default queue '{default_queue_name}' (ID: {new_queue_id}) created successfully.")
-            return new_queue_id
-    except Exception as e:
-        logger.error(f"Error ensuring default queue '{default_queue_name}': {e}", exc_info=True)
+            logger.info(f"Default queue '{default_queue_name}' not found. Attempting to create...")
+            try:
+                new_queue_id = db_manager.insert("INSERT INTO queues (name) VALUES (?)", (default_queue_name,))
+                logger.info(f"Default queue '{default_queue_name}' (ID: {new_queue_id}) created successfully.")
+                return new_queue_id
+            except sqlite3.IntegrityError:
+                # This case means it was created between the fetchone check and the insert attempt (race condition)
+                # or the initial fetchone failed to see it for some reason. Re-fetch to be sure.
+                logger.warning(f"IntegrityError when inserting default queue '{default_queue_name}'. It likely already exists. Re-fetching.")
+                refetched_queue = db_manager.fetchone("SELECT id FROM queues WHERE name = ?", (default_queue_name,))
+                if refetched_queue:
+                    logger.info(f"Default queue '{default_queue_name}' (ID: {refetched_queue['id']}) confirmed to exist after IntegrityError.")
+                    return refetched_queue['id']
+                else:
+                    # This is a more problematic state - insert failed, and it's still not there.
+                    logger.error(f"CRITICAL: Default queue '{default_queue_name}' insert failed with IntegrityError, but queue still not found on re-fetch.")
+                    return None # Indicate failure
+            except Exception as e_insert:
+                logger.error(f"Error inserting default queue '{default_queue_name}': {e_insert}", exc_info=True)
+                return None
+
+
+    except Exception as e: # Catch errors from the initial db_manager.fetchone
+        logger.error(f"Error ensuring default queue '{default_queue_name}' (outer try-except): {e}", exc_info=True)
         return None
 
