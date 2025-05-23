@@ -19,17 +19,18 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def handle_view_exceptions(logger=None, flash_error_message="An unexpected error occurred.", redirect_endpoint='main_bp.index'):
+def handle_view_exceptions(logger_param=None, flash_error_message="An unexpected error occurred.", redirect_endpoint='main_bp.index'):
     """
     A decorator to handle common try-except patterns in view functions.
     It logs the error, flashes a message, and redirects.
     """
-    if logger is None:
-        logger = current_app.logger
+    # Logger will be resolved inside the decorated function to ensure app context.
 
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            # Determine the logger to use within the request context
+            actual_logger = logger_param if logger_param else current_app.logger
             try:
                 return f(*args, **kwargs)
             except Exception as e:
@@ -43,9 +44,9 @@ def handle_view_exceptions(logger=None, flash_error_message="An unexpected error
                 if user_id_from_session:
                     log_extra['session_user_id'] = user_id_from_session
                 
-                logger.error(
-                    f"Error in view function {f.__name__}: {e}", 
-                    exc_info=True, 
+                actual_logger.error(
+                    f"Error in view function {f.__name__}: {e}",
+                    exc_info=True,
                     extra=log_extra
                 )
                 flash(flash_error_message, "danger")
