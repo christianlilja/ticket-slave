@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, session, current_app, flash
 from utils.decorators import login_required, admin_required
+from utils.session_helpers import get_current_session_info
 from app.db import db_manager # Import the db_manager instance
 import sqlite3 # For IntegrityError, though db_manager might abstract this away
 
@@ -9,9 +10,8 @@ queues_bp = Blueprint('queues_bp', __name__)
 @login_required
 @admin_required
 def manage_queues():
-    user_id = session.get('user_id')
-    username = session.get('username')
-    log_extra_base = {'user_id': user_id, 'username': username, 'action_area': 'queue_management'}
+    session_info = get_current_session_info()
+    log_extra_base = {**session_info['base_log_extra'], 'action_area': 'queue_management'}
 
     if request.method == "POST":
         queue_name = request.form.get("name")

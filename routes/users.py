@@ -1,6 +1,8 @@
 from flask import Blueprint, request, redirect, url_for, session, render_template, flash, abort, current_app
 from werkzeug.security import generate_password_hash
 from utils.decorators import login_required, admin_required
+from utils.session_helpers import get_current_session_info
+from utils.db_utils import get_user_or_404
 from app.db import db_manager # Use the db_manager instance
 import sqlite3 # For IntegrityError, if not handled by db_manager
 import re # For email validation in edit_user
@@ -12,11 +14,12 @@ users_bp = Blueprint("users_bp", __name__)
 @login_required
 @admin_required
 def manage_users():
-    admin_user_id = session.get('user_id')
-    admin_username = session.get('username')
-    log_base_extra = {'admin_user_id': admin_user_id, 'admin_username': admin_username}
+    session_info = get_current_session_info()
+    # Use a more descriptive key for the admin user's ID in logs if it's distinct from a target user
+    log_base_extra = {'admin_user_id': session_info['user_id'], 'admin_username': session_info['username']}
+    admin_user_id = session_info['user_id'] # Keep for direct use if needed, e.g., self-delete check
 
-    if not session.get("is_admin"): # Redundant due to @admin_required but good for defense in depth
+    if not session_info.get("is_admin") and not session.get("is_admin"): # Defensive check, session_info might not have is_admin
         current_app.logger.warning("Non-admin attempted user management access (decorator should prevent).", extra=log_base_extra)
         return redirect(url_for("main_bp.index")) # Redirect to main index
 
@@ -100,14 +103,15 @@ def manage_users():
 @login_required
 @admin_required
 def edit_user(user_id_to_edit):
-    admin_user_id = session.get('user_id')
-    admin_username = session.get('username')
-    log_base_extra = {'admin_user_id': admin_user_id, 'admin_username': admin_username, 'target_user_id': user_id_to_edit}
+    session_info = get_current_session_info()
+    log_base_extra = {
+        'admin_user_id': session_info['user_id'],
+        'admin_username': session_info['username'],
+        'target_user_id': user_id_to_edit
+    }
     
-    user = db_manager.fetchone('SELECT * FROM users WHERE id = ?', (user_id_to_edit,))
-    if not user:
-        current_app.logger.warning("Admin edit user: Target user not found.", extra=log_base_extra)
-        abort(404)
+    user = get_user_or_404(user_id_to_edit, db_manager, log_extra=log_base_extra)
+    # No need for the 'if not user:' check and abort(404) as get_user_or_404 handles it.
 
     if request.method == 'POST':
         current_app.logger.info("Admin attempting to update user details", extra={**log_base_extra, 'target_username': user['username']})
